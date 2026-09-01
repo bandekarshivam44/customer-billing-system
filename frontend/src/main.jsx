@@ -1,3 +1,4 @@
+import "./utils/installClick";
 import "./utils/installClock.js";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

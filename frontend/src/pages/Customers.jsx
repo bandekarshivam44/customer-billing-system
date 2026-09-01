@@ -1664,295 +1664,230 @@ function CustomerDetailsModal({ customerId, onClose }) {
 // ======================================================
 // CUSTOMER CARD
 // ======================================================
-function CustomerCard({ customer, onClick, onAddPayment, onEdit, onBalance }) {
-  const [copied, setCopied] = useState(false);
+function CustomerCard({
+  customer,
+  payments,
+  currentMonthInfo,
+  onClick,
+  onAddPayment,
+  onEdit,
+  onBalance,
+}) {
+  const currentMonth = currentMonthInfo.number;
+  const currentYear = currentMonthInfo.year;
 
-  const packageAmount = Number(customer?.packageAmount || 0);
-  const totalPaid = Number(customer?.totalPaid || 0);
-  const currentBalance = Number(customer?.currentBalance || 0);
+  const currentMonthPaid = getMonthPaidAmount(
+    payments,
+    customer._id,
+    currentMonth,
+    currentYear,
+  );
 
-  const handleCopyNuid = async (e) => {
-    e.stopPropagation();
+  // Total outstanding carried forward through current month
+  const balance = getMonthBalanceCalc(
+    customer,
+    payments,
+    currentMonth,
+    currentYear,
+  );
 
-    if (!customer.nuid) return;
+  // Existing detailed billing/payment allocation
+  const breakdown = getFullDueBreakdownWithStatus(
+    customer,
+    payments,
+    currentMonth,
+    currentYear,
+  );
 
-    try {
-      await navigator.clipboard.writeText(customer.nuid);
-      setCopied(true);
-
-      setTimeout(() => {
-        setCopied(false);
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to copy NUID:", error);
-    }
-  };
+  // Show only months that still have money outstanding
+  const outstandingMonths = breakdown.filter(
+    (item) => !item.isAdjustment && item.remaining > 0,
+  );
+const currentStatus =
+  customer.statusHistory?.length > 0
+    ? customer.statusHistory[customer.statusHistory.length - 1].status
+    : customer.status;
   return (
-    <div
-      className="
-        group overflow-hidden rounded-2xl
-        border border-slate-200 bg-white
-        shadow-sm transition-all duration-200
-        hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg
-        dark:border-slate-700 dark:bg-slate-900
-      "
-    >
-      {/* HEADER */}
-      <div className="border-b border-slate-100 p-4 dark:border-slate-800">
+    <div className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900">
+      {/* CUSTOMER HEADER */}
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full cursor-pointer p-5 text-left"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2">
-              <span
-                className="
-                  rounded-lg bg-indigo-50 px-2.5 py-1
-                  text-xs font-black text-indigo-700
-                  dark:bg-indigo-500/10 dark:text-indigo-300
-                "
-              >
-                {String(customer.code || "").toUpperCase()}
+            <div className="mb-1 flex items-center gap-2">
+              <span className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                {customer.code}
               </span>
+{currentStatus === "active" && (
+  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+    ACTIVE
+  </span>
+)}
 
-              {customer.active !== false && (
-                <span
-                  className="
-                    rounded-full bg-emerald-50 px-2.5 py-1
-                    text-[10px] font-black tracking-wide text-emerald-700
-                    dark:bg-emerald-500/10 dark:text-emerald-400
-                  "
-                >
-                  ACTIVE
-                </span>
-              )}
+{currentStatus === "inactive" && (
+  <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+    INACTIVE
+  </span>
+)}
+
+{currentStatus === "free" && (
+  <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+    FREE
+  </span>
+)}
+
+{currentStatus === "dc" && (
+  <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
+    DC
+  </span>
+)}
             </div>
 
-            <h3
-              className="
-                truncate text-lg font-black text-slate-900
-                dark:text-white
-              "
-            >
-              {String(customer.name || "").toUpperCase()}
-            </h3>
+            <h2 className="truncate text-lg font-bold text-slate-900 dark:text-white">
+              {customer.name}
+            </h2>
           </div>
-        </div>
-      </div>
 
-      {/* CUSTOMER INFO */}
-      <div className="grid grid-cols-2 gap-3 p-4">
-        {/* NUID */}
-        <div
-          onClick={handleCopyNuid}
-          className="cursor-pointer rounded-xl bg-slate-50 p-3 transition hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-indigo-950/40"
-          title="Click to copy NUID"
-        >
-          <div className="flex items-center justify-between gap-2">
+          <ChevronRight
+            size={20}
+            className="shrink-0 text-slate-300 transition group-hover:translate-x-1 group-hover:text-indigo-500"
+          />
+        </div>
+
+        {/* DETAILS */}
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          {/* NUID */}
+          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
             <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
               NUID
             </p>
 
-            {customer.nuid &&
-              (copied ? (
-                <Check size={14} className="text-emerald-600" />
-              ) : (
-                <Copy
-                  size={14}
-                  className="text-slate-400 transition group-hover:text-indigo-500"
-                />
-              ))}
+            <p className="mt-1 truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {customer.nuid || "-"}
+            </p>
           </div>
 
-          <p
-            className={`mt-1 truncate text-sm font-semibold ${
-              copied ? "text-emerald-600" : "text-slate-700 dark:text-slate-200"
+          {/* PACKAGE */}
+          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              Package
+            </p>
+
+            <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+              ₹{Number(customer.packageAmount || 0).toLocaleString("en-IN")}
+              <span className="ml-1 text-[10px] font-medium text-slate-400">
+                / month
+              </span>
+            </p>
+          </div>
+
+          {/* CURRENT MONTH PAID */}
+          <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/30">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+              Paid
+            </p>
+
+            <p className="mt-1 text-sm font-bold text-emerald-700 dark:text-emerald-400">
+              ₹{currentMonthPaid.toLocaleString("en-IN")}
+            </p>
+          </div>
+
+          {/* TOTAL BALANCE */}
+          <div
+            className={`rounded-xl p-3 ${
+              balance > 0
+                ? "bg-red-50 dark:bg-red-950/30"
+                : "bg-emerald-50 dark:bg-emerald-950/30"
             }`}
           >
-            {copied ? "COPIED!" : customer.nuid || "-"}
-          </p>
-        </div>
-
-        {/* PACKAGE */}
-        <div
-          className="
-            rounded-xl border border-slate-200
-            bg-slate-50 p-3
-            dark:border-slate-700 dark:bg-slate-800/60
-          "
-        >
-          <div className="mb-1 flex items-center gap-1.5">
-            <IndianRupee size={14} className="text-indigo-500" />
-
-            <span
-              className="
-                text-[10px] font-bold uppercase tracking-wide
-                text-slate-400
-              "
-            >
-              Package
-            </span>
-          </div>
-
-          <p className="text-sm font-black text-slate-800 dark:text-white">
-            ₹{packageAmount.toLocaleString("en-IN")}
-            <span className="ml-1 text-[10px] font-medium text-slate-400">
-              / month
-            </span>
-          </p>
-        </div>
-
-        {/* PAID */}
-        <div
-          className="
-            rounded-xl border border-emerald-100
-            bg-emerald-50/70 p-3
-            dark:border-emerald-900/40
-            dark:bg-emerald-950/20
-          "
-        >
-          <div className="mb-1 flex items-center gap-1.5">
-            <CheckCircle2
-              size={14}
-              className="text-emerald-600 dark:text-emerald-400"
-            />
-
-            <span
-              className="
-                text-[10px] font-bold uppercase tracking-wide
-                text-emerald-600 dark:text-emerald-400
-              "
-            >
-              Paid
-            </span>
-          </div>
-
-          <p className="text-sm font-black text-emerald-700 dark:text-emerald-300">
-            ₹{totalPaid.toLocaleString("en-IN")}
-          </p>
-        </div>
-
-        {/* BALANCE */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onBalance();
-          }}
-          className={`
-            rounded-xl border p-3 text-left transition
-            ${
-              currentBalance > 0
-                ? `
-                  border-red-100 bg-red-50
-                  hover:border-red-200 hover:bg-red-100
-                  dark:border-red-900/40 dark:bg-red-950/20
-                  dark:hover:bg-red-950/40
-                `
-                : `
-                  border-emerald-100 bg-emerald-50
-                  hover:border-emerald-200 hover:bg-emerald-100
-                  dark:border-emerald-900/40 dark:bg-emerald-950/20
-                  dark:hover:bg-emerald-950/40
-                `
-            }
-          `}
-        >
-          <div className="mb-1 flex items-center gap-1.5">
-            <IndianRupee
-              size={14}
-              className={
-                currentBalance > 0 ? "text-red-500" : "text-emerald-500"
-              }
-            />
-
-            <span
-              className={`
-                text-[10px] font-bold uppercase tracking-wide
-                ${
-                  currentBalance > 0
-                    ? "text-red-500"
-                    : "text-emerald-600 dark:text-emerald-400"
-                }
-              `}
-            >
-              Balance
-            </span>
-          </div>
-
-          <p
-            className={`
-              text-sm font-black
-              ${
-                currentBalance > 0
+            <p
+              className={`text-[10px] font-bold uppercase tracking-wide ${
+                balance > 0
                   ? "text-red-600 dark:text-red-400"
                   : "text-emerald-600 dark:text-emerald-400"
-              }
-            `}
-          >
-            ₹{currentBalance.toLocaleString("en-IN")}
-          </p>
-        </button>
-      </div>
+              }`}
+            >
+              Balance
+            </p>
+
+            <p
+              className={`mt-1 text-sm font-bold ${
+                balance > 0
+                  ? "text-red-700 dark:text-red-400"
+                  : "text-emerald-700 dark:text-emerald-400"
+              }`}
+            >
+              ₹{balance.toLocaleString("en-IN")}
+            </p>
+          </div>
+        </div>
+      </button>
 
       {/* BALANCE BREAKDOWN */}
-      <div className="mx-4 mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">
+      <div className="mx-5 mb-4 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800">
+          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
             Balance Breakdown
           </p>
 
           <span
-            className={`
-              rounded-md px-2 py-0.5 text-[9px] font-black
-              ${
-                currentBalance > 0
-                  ? "bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-400"
-                  : "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
-              }
-            `}
+            className={`rounded-md px-2 py-1 text-[9px] font-black ${
+              balance > 0
+                ? "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"
+                : "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400"
+            }`}
           >
-            {currentBalance > 0 ? "DUE" : "CLEAR"}
+            {balance > 0 ? "DUE" : "CLEAR"}
           </span>
         </div>
 
-        <div className="grid grid-cols-3 divide-x divide-slate-200 dark:divide-slate-700">
-          <div className="pr-2">
-            <p className="text-[10px] text-slate-400">Package</p>
-            <p className="mt-0.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-              ₹{packageAmount.toLocaleString("en-IN")}
-            </p>
-          </div>
+        {outstandingMonths.length > 0 ? (
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+            {outstandingMonths.map((item, index) => (
+              <div
+                key={`${item.label}-${index}`}
+                className="flex items-center justify-between px-3 py-2.5"
+              >
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {item.label}
+                </span>
 
-          <div className="px-2">
-            <p className="text-[10px] text-slate-400">Paid</p>
-            <p className="mt-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              ₹{totalPaid.toLocaleString("en-IN")}
-            </p>
+                <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                  ₹{Number(item.remaining || 0).toLocaleString("en-IN")}
+                </span>
+              </div>
+            ))}
           </div>
+        ) : (
+          <div className="px-3 py-3 text-center">
+            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+              No outstanding balance
+            </span>
+          </div>
+        )}
 
-          <div className="pl-2">
-            <p className="text-[10px] text-slate-400">Outstanding</p>
-            <p
-              className={`
-                mt-0.5 text-xs font-black
-                ${
-                  currentBalance > 0
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-emerald-600 dark:text-emerald-400"
-                }
-              `}
-            >
-              ₹{currentBalance.toLocaleString("en-IN")}
-            </p>
-          </div>
+        <div className="flex items-center justify-between border-t border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
+          <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+            Total Outstanding
+          </span>
+
+          <span
+            className={`text-sm font-black ${
+              balance > 0
+                ? "text-red-600 dark:text-red-400"
+                : "text-emerald-600 dark:text-emerald-400"
+            }`}
+          >
+            ₹{balance.toLocaleString("en-IN")}
+          </span>
         </div>
       </div>
+
       {/* ACTIONS */}
-      <div
-        className="
-    grid grid-cols-4 gap-2
-    border-t border-slate-100 p-4
-    dark:border-slate-800
-  "
-      >
+      <div className="flex gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
         {/* PAYMENT */}
         <button
           type="button"
@@ -1960,17 +1895,10 @@ function CustomerCard({ customer, onClick, onAddPayment, onEdit, onBalance }) {
             e.stopPropagation();
             onAddPayment();
           }}
-          className="
-      flex h-10 w-full cursor-pointer
-      items-center justify-center gap-1
-      rounded-xl bg-indigo-600 px-2
-      text-xs font-bold text-white
-      transition hover:bg-indigo-700
-      active:scale-[0.97]
-    "
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98]"
         >
-          <Plus size={15} />
-          <span>Payment</span>
+          <Plus size={17} />
+          Payment
         </button>
 
         {/* EDIT */}
@@ -1980,23 +1908,10 @@ function CustomerCard({ customer, onClick, onAddPayment, onEdit, onBalance }) {
             e.stopPropagation();
             onEdit();
           }}
-          className="
-      flex h-10 w-full cursor-pointer
-      items-center justify-center gap-1
-      rounded-xl border border-slate-200
-      bg-white px-2
-      text-xs font-bold text-slate-700
-      transition hover:border-indigo-200
-      hover:bg-indigo-50 hover:text-indigo-600
-      active:scale-[0.97]
-      dark:border-slate-700
-      dark:bg-slate-900
-      dark:text-slate-200
-      dark:hover:bg-indigo-950
-    "
+          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
         >
           <Edit3 size={14} />
-          <span>Edit</span>
+          Edit
         </button>
 
         {/* BALANCE */}
@@ -2006,21 +1921,10 @@ function CustomerCard({ customer, onClick, onAddPayment, onEdit, onBalance }) {
             e.stopPropagation();
             onBalance();
           }}
-          className="
-      flex h-10 w-full cursor-pointer
-      items-center justify-center gap-1
-      rounded-xl border border-amber-200
-      bg-amber-50 px-2
-      text-xs font-bold text-amber-700
-      transition hover:bg-amber-100
-      active:scale-[0.97]
-      dark:border-amber-900
-      dark:bg-amber-950
-      dark:text-amber-300
-    "
+          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
         >
           <IndianRupee size={14} />
-          <span>Balance</span>
+          Balance
         </button>
 
         {/* DETAILS */}
@@ -2030,25 +1934,10 @@ function CustomerCard({ customer, onClick, onAddPayment, onEdit, onBalance }) {
             e.stopPropagation();
             onClick();
           }}
-          className="
-      flex h-10 w-full cursor-pointer
-      items-center justify-center gap-1
-      rounded-xl border border-slate-200
-      bg-white px-2
-      text-xs font-bold text-slate-700
-      transition hover:border-indigo-200
-      hover:bg-indigo-50 hover:text-indigo-700
-      active:scale-[0.97]
-      dark:border-slate-700
-      dark:bg-slate-800
-      dark:text-slate-200
-      dark:hover:border-indigo-700
-      dark:hover:bg-indigo-950
-      dark:hover:text-indigo-300
-    "
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
         >
-          <span>Details</span>
-          <ChevronRight size={14} />
+          <ChevronRight size={17} />
+          Details
         </button>
       </div>
     </div>
@@ -3829,7 +3718,7 @@ const shivamTotal = useMemo(
                 className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               >
                 <MapPin size={17} />
-                <span className="hidden md:inline">Bulk Assign</span>
+                <span className="hidden md:inline">Bulk Assignn</span>
               </button>
               {/* IMPORT button*/}
 
@@ -4126,14 +4015,16 @@ const shivamTotal = useMemo(
         {!error && filteredCustomers.length > 0 && view === "cards" && (
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {displayedCustomers.map((customer) => (
-              <CustomerCard
-                key={customer._id}
-                customer={customer}
-                onClick={() => handleCustomerClick(customer)}
-                onAddPayment={() => handleAddPayment(customer)}
-                onEdit={() => handleEdit(customer)}
-                onBalance={() => handleBalance(customer)}
-              />
+            <CustomerCard
+  key={customer._id}
+  customer={customer}
+  payments={payments}
+  currentMonthInfo={currentMonthInfo}
+  onClick={() => handleCustomerClick(customer)}
+  onAddPayment={() => handleAddPayment(customer)}
+  onEdit={() => handleEdit(customer)}
+  onBalance={() => handleBalance(customer)}
+/>
             ))}
           </div>
         )}
