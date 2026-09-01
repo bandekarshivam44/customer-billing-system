@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+/*
+  Tailwind v4:
+  Make dark: classes respond to html.dark
+  instead of the operating system theme.
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Dark mode */
+html.dark body {
+  background: #020617;
+  color: #f8fafc;
+}
+
+/* Every button should feel clickable */
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* Better mobile interaction */
+button,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Remove number input arrows */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+/* Better scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+html.dark * {
+  scrollbar-color: #475569 transparent;
+}
+
+/* Smooth theme transition */
+html,
+body,
+button,
+input,
+select,
+textarea {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+.input {
+  height: 48px;
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: white;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgb(99 102 241 / 10%);
+}
+
+html.dark .input {
+  border-color: #334155;
+  background: #1e293b;
+  color: white;
+}
+
+html.dark .input:focus {
+  border-color: #818cf8;
+}
