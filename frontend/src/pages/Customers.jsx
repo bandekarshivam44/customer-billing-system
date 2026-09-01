@@ -3833,7 +3833,7 @@ const shivamTotal = useMemo(
               </button>
               {/* IMPORT button*/}
 
-              <button
+              {/* <button
                 type="button"
                 onClick={() => setShowImportModal(true)}
                 className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
@@ -3841,7 +3841,7 @@ const shivamTotal = useMemo(
                 <Upload size={17} />
 
                 <span className=" md:inline">Import</span>
-              </button>
+              </button> */}
               {/* ADD CUSTOMER */}
 
               <button
