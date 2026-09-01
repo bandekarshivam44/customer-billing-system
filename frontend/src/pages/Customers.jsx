@@ -2629,8 +2629,39 @@ const currentMonthBalance = currentEntry?.balance ?? 0;
 // ======================================================
 // STAT CARD
 // ======================================================
+function StatCard({
+  icon: Icon,
+  title,
+  value,
+  subtitle,
+  iconClass,
+  onClick,
+  customers = [],
+}) {
+  const activeCount = customers.filter((c) => {
+    const status = c.statusHistory?.length
+      ? c.statusHistory[c.statusHistory.length - 1]?.status
+      : c.status;
 
-function StatCard({ icon: Icon, title, value, subtitle, iconClass, onClick }) {
+    return status === "active";
+  }).length;
+
+  const freeCount = customers.filter((c) => {
+    const status = c.statusHistory?.length
+      ? c.statusHistory[c.statusHistory.length - 1]?.status
+      : c.status;
+
+    return status === "free";
+  }).length;
+
+  const inactiveCount = customers.filter((c) => {
+    const status = c.statusHistory?.length
+      ? c.statusHistory[c.statusHistory.length - 1]?.status
+      : c.status;
+
+    return status === "inactive";
+  }).length;
+
   return (
     <div
       onClick={onClick}
@@ -2640,26 +2671,44 @@ function StatCard({ icon: Icon, title, value, subtitle, iconClass, onClick }) {
           : ""
       }`}
     >
-      {" "}
       <div className="flex items-start justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
             {title}
           </p>
 
-          <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
-            {value}
-          </p>
+          {/* Show status counts ONLY for Customer Status card */}
+          {title === "Customer Status" ? (
+            <div className="mt-3 flex flex-col items-right gap-x-3 gap-y-1 text-sm">
+              <span className="font-black text-emerald-600 dark:text-emerald-400">
+                Active - {activeCount} 
+              </span>
 
-          {subtitle && (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {subtitle}
-            </p>
+              <span className="font-black text-blue-600 dark:text-blue-400">
+                Free - {freeCount} 
+              </span>
+
+              <span className="font-black text-red-600 dark:text-red-400">
+                DC - {inactiveCount} 
+              </span>
+            </div>
+          ) : (
+            <>
+              <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+                {value}
+              </p>
+
+              {subtitle && (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {subtitle}
+                </p>
+              )}
+            </>
           )}
         </div>
 
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
         >
           <Icon size={19} />
         </div>
@@ -3757,19 +3806,18 @@ const shivamTotal = useMemo(
 
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
-            icon={Users}
-            title="Total Customers"
-            value={totalCustomers}
-            subtitle="All registered customers"
-            iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
-          />
-          <StatCard
-            icon={UserCheck}
-            title="Active Customers"
-            value={activeCustomersList.length}
-            subtitle={`${inactiveCount} inactive`}
-            iconClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300"
-          />
+  icon={Users}
+  title="Total Customers"
+  value={customers.length}
+  subtitle="All registered customers"
+  iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
+/>
+       <StatCard
+  icon={UserCheck}
+  title="Customer Status"
+  customers={customers}
+  iconClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300"
+/>
 
           <div
             onClick={() => setShowCollectionModal(true)}
