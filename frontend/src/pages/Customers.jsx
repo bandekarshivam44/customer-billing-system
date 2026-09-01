@@ -1887,59 +1887,59 @@ const currentStatus =
       </div>
 
       {/* ACTIONS */}
-      <div className="flex gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
-        {/* PAYMENT */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddPayment();
-          }}
-          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98]"
-        >
-          <Plus size={17} />
-          Payment
-        </button>
+<div className="grid grid-cols-2 gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+  {/* PAYMENT */}
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      onAddPayment();
+    }}
+    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 text-sm font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98]"
+  >
+    <Plus size={16} />
+    Payment
+  </button>
 
-        {/* EDIT */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-        >
-          <Edit3 size={14} />
-          Edit
-        </button>
+  {/* EDIT */}
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      onEdit();
+    }}
+    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
+  >
+    <Edit3 size={16} />
+    Edit
+  </button>
 
-        {/* BALANCE */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onBalance();
-          }}
-          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
-        >
-          <IndianRupee size={14} />
-          Balance
-        </button>
+  {/* BALANCE */}
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      onBalance();
+    }}
+    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+  >
+    <IndianRupee size={16} />
+    Balance
+  </button>
 
-        {/* DETAILS */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-          }}
-          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
-        >
-          <ChevronRight size={17} />
-          Details
-        </button>
-      </div>
+  {/* DETAILS */}
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
+    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
+  >
+    <ChevronRight size={16} />
+    Details
+  </button>
+</div>
     </div>
   );
 }
