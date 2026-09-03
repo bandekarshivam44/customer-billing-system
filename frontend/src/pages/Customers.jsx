@@ -2459,7 +2459,13 @@ function getSortValue(
   }
 }
 
-function SortableHeader({ label, sortKey, sortConfig, onSort, align = "left" }) {
+function SortableHeader({
+  label,
+  sortKey,
+  sortConfig,
+  onSort,
+  align = "left",
+}) {
   const isActive = sortConfig.key === sortKey;
   return (
     <th
@@ -3563,7 +3569,7 @@ export default function Customers() {
       return matchesSearch && matchesLocation;
     });
   }, [customers, search, selectedLocation]);
-    const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
   const toggleSort = (key) => {
     setSortConfig((prev) =>
@@ -4006,7 +4012,7 @@ export default function Customers() {
                 Customers
               </h1>
             </div>
-            <TestClockWidget />
+            {/* <TestClockWidget /> */}
             {/* Actions */}
 
             <div className="flex items-center gap-2">
@@ -4389,7 +4395,7 @@ export default function Customers() {
                 </div>
               </div>
               <table className="min-w-[1650px] w-full border-collapse text-center">
-                                <thead className="bg-slate-50 dark:bg-slate-800/80">
+                <thead className="bg-slate-50 dark:bg-slate-800/80">
                   <tr>
                     <th className="px-4 py-4">
                       <input
@@ -4402,16 +4408,72 @@ export default function Customers() {
                         className="h-4 w-4 cursor-pointer accent-indigo-600"
                       />
                     </th>
-                    <SortableHeader label="Code" sortKey="code" sortConfig={sortConfig} onSort={toggleSort} />
-                    <SortableHeader label="Customer" sortKey="name" sortConfig={sortConfig} onSort={toggleSort} />
-                    <SortableHeader label="NUID" sortKey="nuid" sortConfig={sortConfig} onSort={toggleSort} />
-                    <SortableHeader label="Package" sortKey="package" sortConfig={sortConfig} onSort={toggleSort} />
-                    <SortableHeader label={`${monthBeforePrevious.name} Paid`} sortKey="oldPaid" sortConfig={sortConfig} onSort={toggleSort} align="right" />
-                    <SortableHeader label={`${monthBeforePrevious.name} Bal`} sortKey="oldBalance" sortConfig={sortConfig} onSort={toggleSort} align="right" />
-                    <SortableHeader label={`${previousMonth.name} Paid`} sortKey="previousPaid" sortConfig={sortConfig} onSort={toggleSort} align="right" />
-                    <SortableHeader label={`${previousMonth.name} Bal`} sortKey="previousBalance" sortConfig={sortConfig} onSort={toggleSort} align="right" />
-                    <SortableHeader label={`${currentMonthInfo.name} Paid`} sortKey="currentPaid" sortConfig={sortConfig} onSort={toggleSort} align="right" />
-                    <SortableHeader label={`${currentMonthInfo.name} Bal`} sortKey="currentBalance" sortConfig={sortConfig} onSort={toggleSort} align="right" />
+                    <SortableHeader
+                      label="Code"
+                      sortKey="code"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                    />
+                    <SortableHeader
+                      label="Customer"
+                      sortKey="name"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                    />
+                    <SortableHeader
+                      label="NUID"
+                      sortKey="nuid"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                    />
+                    <SortableHeader
+                      label="Package"
+                      sortKey="package"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                    />
+                    <SortableHeader
+                      label={`${monthBeforePrevious.name} Paid`}
+                      sortKey="oldPaid"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                      align="right"
+                    />
+                    <SortableHeader
+                      label={`${monthBeforePrevious.name} Bal`}
+                      sortKey="oldBalance"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                      align="right"
+                    />
+                    <SortableHeader
+                      label={`${previousMonth.name} Paid`}
+                      sortKey="previousPaid"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                      align="right"
+                    />
+                    <SortableHeader
+                      label={`${previousMonth.name} Bal`}
+                      sortKey="previousBalance"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                      align="right"
+                    />
+                    <SortableHeader
+                      label={`${currentMonthInfo.name} Paid`}
+                      sortKey="currentPaid"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                      align="right"
+                    />
+                    <SortableHeader
+                      label={`${currentMonthInfo.name} Bal`}
+                      sortKey="currentBalance"
+                      sortConfig={sortConfig}
+                      onSort={toggleSort}
+                      align="right"
+                    />
                     <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                       Actions
                     </th>
