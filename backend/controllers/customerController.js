@@ -86,28 +86,9 @@ const getCustomers = async (req, res) => {
           monthlyBilling: [],
         };
       }
-
       // ==================================================
-      // OVERRIDE ANCHOR (reset point if one exists ≤ current month)
+      // STATUS-AWARE PACKAGE (matches frontend getEffectivePackageForMonth)
       // ==================================================
-      const overrides = customer.balanceOverrides || [];
-      let anchorKey = startKey;
-      let base = 0;
-
-      for (const o of overrides) {
-        const k = getMonthKey(o.month, o.year);
-        if (k <= currentKey && k >= anchorKey) {
-          anchorKey = k + 1; // resume the month AFTER the override
-          base = Number(o.balance || 0);
-        }
-      }
-
-      // ==================================================
-      // MONTHLY BILLING (running ledger, paidAt-based)
-      // ==================================================
-      const monthlyBilling = [];
-      let runningOutstanding = base;
-
       const getStatusForMonth = (m, y) => {
         const targetKey = getMonthKey(m, y);
         let status = "active";
@@ -132,13 +113,44 @@ const getCustomers = async (req, res) => {
         };
       }
 
-      for (let key = anchorKey; key <= currentKey; key++) {
+      const getEffectivePackage = (m, y) => {
+        const status = getStatusForMonth(m, y);
+        if (status === "inactive" || status === "free") return 0;
+        return getPackageForMonth(customer, m, y);
+      };
+
+      // ==================================================
+      // MONTHLY BILLING — cumulative due minus cumulative paid,
+      // same model as frontend getMonthBalanceCalc, so table
+      // and Balance Modal / Payment History can never disagree.
+      // ==================================================
+      const overrides = customer.balanceOverrides || [];
+      const monthlyBilling = [];
+
+      for (let key = startKey; key <= currentKey; key++) {
         const { year, month } = getMonthFromKey(key);
-                const monthStatus = getStatusForMonth(month, year);
-        const packageAmount =
-          monthStatus === "inactive" || monthStatus === "free"
-            ? 0
-            : getPackageForMonth(customer, month, year);
+        const packageAmount = getEffectivePackage(month, year);
+
+        let dueCumulative = 0;
+        for (let k = startKey; k <= key; k++) {
+          const { year: yy, month: mm } = getMonthFromKey(k);
+          dueCumulative += getEffectivePackage(mm, yy);
+        }
+        const adjustmentTotal = overrides
+          .filter((o) => getMonthKey(o.month, o.year) <= key)
+          .reduce(
+            (sum, o) => sum + (o.type === "deduct" ? -o.amount : o.amount),
+            0,
+          );
+        dueCumulative += adjustmentTotal;
+
+        const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
+        const paidCumulative = customerPayments
+          .filter((p) => new Date(p.paidAt) <= monthEnd)
+          .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+        const balance = Math.max(0, dueCumulative - paidCumulative);
+
         let monthPaid = 0;
         for (const payment of customerPayments) {
           const d = new Date(payment.paidAt);
@@ -147,23 +159,23 @@ const getCustomers = async (req, res) => {
           }
         }
 
-        runningOutstanding = Math.max(
-          0,
-          runningOutstanding + packageAmount - monthPaid,
-        );
         monthlyBilling.push({
           month,
           year,
           package: packageAmount,
           paid: monthPaid,
-          balance: runningOutstanding,
+          balance,
         });
       }
+
+      const finalBalance = monthlyBilling.length
+        ? monthlyBilling[monthlyBilling.length - 1].balance
+        : 0;
 
       return {
         ...customer,
         totalPaid,
-        currentBalance: runningOutstanding,
+        currentBalance: finalBalance,
         totalPayments: customerPayments.length,
         monthlyBilling,
       };
@@ -428,8 +440,18 @@ const updateCustomer = async (req, res) => {
         message: "Customer not found",
       });
     }
-        const { code, name, nuid, mobile, packageAmount, location, active, status, statusMonth, statusYear } =
-      req.body;
+    const {
+      code,
+      name,
+      nuid,
+      mobile,
+      packageAmount,
+      location,
+      active,
+      status,
+      statusMonth,
+      statusYear,
+    } = req.body;
     // ------------------------------------------
     // CODE
     // ------------------------------------------
@@ -540,7 +562,10 @@ const updateCustomer = async (req, res) => {
     // STATUS
     // ------------------------------------------
 
-    if (status !== undefined && ["active", "inactive", "free"].includes(status)) {
+    if (
+      status !== undefined &&
+      ["active", "inactive", "free"].includes(status)
+    ) {
       const now = new Date();
       const m = Number(req.body.statusMonth) || now.getMonth() + 1;
       const y = Number(req.body.statusYear) || now.getFullYear();
@@ -556,7 +581,7 @@ const updateCustomer = async (req, res) => {
       const todayKey = now.getFullYear() * 12 + (now.getMonth() + 1);
       const applicable = [...customer.statusHistory]
         .filter((s) => s.year * 12 + s.month <= todayKey)
-        .sort((a, b) => (b.year * 12 + b.month) - (a.year * 12 + a.month))[0];
+        .sort((a, b) => b.year * 12 + b.month - (a.year * 12 + a.month))[0];
 
       customer.status = applicable ? applicable.status : "active";
     }
@@ -615,22 +640,32 @@ const deleteCustomer = async (req, res) => {
 const importCustomers = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, message: "Excel or CSV file is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Excel or CSV file is required" });
     }
 
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     if (!workbook.SheetNames.length) {
-      return res.status(400).json({ success: false, message: "No worksheet found" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No worksheet found" });
     }
 
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
     if (!rows.length) {
-      return res.status(400).json({ success: false, message: "File contains no customer records" });
+      return res
+        .status(400)
+        .json({ success: false, message: "File contains no customer records" });
     }
 
-    let created = 0, updated = 0, skipped = 0;
-    let paymentsCreated = 0, statusEntriesCreated = 0, advanceAdjustmentsCreated = 0;
+    let created = 0,
+      updated = 0,
+      skipped = 0;
+    let paymentsCreated = 0,
+      statusEntriesCreated = 0,
+      advanceAdjustmentsCreated = 0;
     const errors = [];
 
     const MONTH_COLUMNS = [
@@ -640,7 +675,8 @@ const importCustomers = async (req, res) => {
     ];
 
     const getCell = (row, ...keys) => {
-      for (const k of keys) if (row[k] !== undefined && row[k] !== "") return row[k];
+      for (const k of keys)
+        if (row[k] !== undefined && row[k] !== "") return row[k];
       return "";
     };
 
@@ -648,28 +684,60 @@ const importCustomers = async (req, res) => {
       const row = rows[i];
 
       try {
-        const code = String(getCell(row, "CODE", "Code", "code")).trim().toUpperCase();
+        const code = String(getCell(row, "CODE", "Code", "code"))
+          .trim()
+          .toUpperCase();
         const name = String(getCell(row, "NAME", "Name", "name")).trim();
 
-        const issueText = String(getCell(row, "ISSUE", "Issue", "issue")).trim();
+        const issueText = String(
+          getCell(row, "ISSUE", "Issue", "issue"),
+        ).trim();
         if (issueText) {
           skipped++;
-          errors.push({ row: i + 2, code, reason: `Flagged in source file: ${issueText}` });
+          errors.push({
+            row: i + 2,
+            code,
+            reason: `Flagged in source file: ${issueText}`,
+          });
           continue;
         }
 
-        const packRaw = getCell(row, "PACKAGE", "Package", "package", "PACK", "Pack", "pack");
-        const otherFieldsEmpty = !code && !String(getCell(row, "NUID")).trim() && !String(packRaw).trim();
+        const packRaw = getCell(
+          row,
+          "PACKAGE",
+          "Package",
+          "package",
+          "PACK",
+          "Pack",
+          "pack",
+        );
+        const otherFieldsEmpty =
+          !code &&
+          !String(getCell(row, "NUID")).trim() &&
+          !String(packRaw).trim();
         if (name && otherFieldsEmpty) continue;
 
         const nuid = String(getCell(row, "NUID", "Nuid", "nuid")).trim();
-        const mobile = String(getCell(row, "MOBILE", "Mobile", "mobile")).trim();
+        const mobile = String(
+          getCell(row, "MOBILE", "Mobile", "mobile"),
+        ).trim();
         const packageAmount = Number(packRaw);
-        const locationValue = String(getCell(row, "LOCATION", "Location", "location")).trim();
+        const locationValue = String(
+          getCell(row, "LOCATION", "Location", "location"),
+        ).trim();
 
-        if (!code || !name || !Number.isFinite(packageAmount) || !locationValue) {
+        if (
+          !code ||
+          !name ||
+          !Number.isFinite(packageAmount) ||
+          !locationValue
+        ) {
           skipped++;
-          errors.push({ row: i + 2, code, reason: "CODE, NAME, PACKAGE and LOCATION are required" });
+          errors.push({
+            row: i + 2,
+            code,
+            reason: "CODE, NAME, PACKAGE and LOCATION are required",
+          });
           continue;
         }
 
@@ -684,7 +752,11 @@ const importCustomers = async (req, res) => {
 
         if (!location) {
           skipped++;
-          errors.push({ row: i + 2, code, reason: `Location "${locationValue}" not found` });
+          errors.push({
+            row: i + 2,
+            code,
+            reason: `Location "${locationValue}" not found`,
+          });
           continue;
         }
 
@@ -699,7 +771,11 @@ const importCustomers = async (req, res) => {
           updated++;
         } else {
           customer = new Customer({
-            code, name, nuid, mobile, packageAmount,
+            code,
+            name,
+            nuid,
+            mobile,
+            packageAmount,
             location: location._id,
             billingStartMonth: 8,
             billingStartYear: 2026,
@@ -713,15 +789,15 @@ const importCustomers = async (req, res) => {
 
         if (!customer.balanceOverrides) customer.balanceOverrides = [];
         if (!customer.statusHistory) customer.statusHistory = [];
-
-        // Save the base customer record FIRST, independent of month processing below —
-        // so even if a payment fails, the customer + any status/override entries
-        // collected so far are never lost.
         await customer.save();
 
         for (const { prefix, month, year } of MONTH_COLUMNS) {
           try {
-            const paidCellRaw = getCell(row, `${prefix}_PAID`, `${prefix}_Paid`);
+            const paidCellRaw = getCell(
+              row,
+              `${prefix}_PAID`,
+              `${prefix}_Paid`,
+            );
             const paidCell = String(paidCellRaw).trim().toUpperCase();
 
             if (paidCell === "DC") {
@@ -729,7 +805,6 @@ const importCustomers = async (req, res) => {
                 (s) => !(s.month === month && s.year === year),
               );
               customer.statusHistory.push({ month, year, status: "inactive" });
-              await customer.save();
               statusEntriesCreated++;
               continue;
             }
@@ -739,22 +814,22 @@ const importCustomers = async (req, res) => {
                 (s) => !(s.month === month && s.year === year),
               );
               customer.statusHistory.push({ month, year, status: "free" });
-              await customer.save();
               statusEntriesCreated++;
               continue;
             }
 
             if (paidCell === "PD") {
               customer.balanceOverrides.push({
-                month, year, type: "deduct", amount: packageAmount,
+                month,
+                year,
+                type: "deduct",
+                amount: packageAmount,
                 reason: "Paid in advance (PD, imported)",
                 createdAt: new Date(),
               });
-              await customer.save();
               advanceAdjustmentsCreated++;
               continue;
             }
-
             const paidNumber = Number(paidCellRaw);
             if (Number.isFinite(paidNumber) && paidNumber > 0) {
               await Payment.create({
@@ -769,11 +844,14 @@ const importCustomers = async (req, res) => {
             }
           } catch (monthError) {
             errors.push({
-              row: i + 2, code,
+              row: i + 2,
+              code,
               reason: `${prefix}: ${monthError.message}`,
             });
           }
         }
+
+        await customer.save();
 
         if (typeof recalcCustomerBalance === "function") {
           await recalcCustomerBalance(customer._id);
@@ -787,12 +865,23 @@ const importCustomers = async (req, res) => {
     return res.json({
       success: true,
       message: "Customer import completed",
-      summary: { totalRows: rows.length, created, updated, skipped, paymentsCreated, statusEntriesCreated, advanceAdjustmentsCreated },
+      summary: {
+        totalRows: rows.length,
+        created,
+        updated,
+        skipped,
+        paymentsCreated,
+        statusEntriesCreated,
+        advanceAdjustmentsCreated,
+      },
       errors,
     });
   } catch (error) {
     console.error("Import customers error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to import customers" });
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to import customers",
+    });
   }
 };
 // ======================================================
@@ -848,12 +937,10 @@ const addBalanceAdjustment = async (req, res) => {
       !["add", "deduct"].includes(type) ||
       amount == null
     ) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "month, year, type ('add'|'deduct') and amount are required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "month, year, type ('add'|'deduct') and amount are required",
+      });
     }
 
     const amountNumber = Number(amount);
@@ -884,12 +971,10 @@ const addBalanceAdjustment = async (req, res) => {
     res.json({ success: true, message: "Adjustment added", data: customer });
   } catch (error) {
     console.error("Balance adjustment error:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: error.message || "Failed to add adjustment",
-      });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to add adjustment",
+    });
   }
 };
 const updateCustomerStatus = async (req, res) => {
@@ -915,13 +1000,13 @@ const updateCustomerStatus = async (req, res) => {
     customer.statusHistory = customer.statusHistory.filter(
       (s) => !(s.month === m && s.year === y),
     );
-        customer.statusHistory.push({ month: m, year: y, status });
+    customer.statusHistory.push({ month: m, year: y, status });
 
     const now2 = new Date();
     const todayKey = now2.getFullYear() * 12 + (now2.getMonth() + 1);
     const applicable = [...customer.statusHistory]
       .filter((s) => s.year * 12 + s.month <= todayKey)
-      .sort((a, b) => (b.year * 12 + b.month) - (a.year * 12 + a.month))[0];
+      .sort((a, b) => b.year * 12 + b.month - (a.year * 12 + a.month))[0];
 
     customer.status = applicable ? applicable.status : "active";
 

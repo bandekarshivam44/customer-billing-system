@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import {
@@ -1075,11 +1075,18 @@ function buildDueBuckets(customer, uptoMonth, uptoYear) {
 
 function computePaymentAllocations(customer, payments) {
   const now = new Date();
-  const buckets = buildDueBuckets(
+  const scheduleRows = buildScheduleRows(
     customer,
     now.getMonth() + 1,
     now.getFullYear(),
-  ).map((b) => ({ ...b, remaining: b.amount }));
+  );
+
+  const buckets = scheduleRows.map((r) => ({
+    month: r.month,
+    year: r.year,
+    label: r.label,
+    remaining: r.netDue,
+  }));
 
   const sorted = payments.slice().sort((a, b) => {
     const diff = new Date(a.paidAt) - new Date(b.paidAt);
@@ -1104,11 +1111,11 @@ function computePaymentAllocations(customer, payments) {
       amount -= applied;
       allocations.push({ label: bucket.label, amount: applied });
 
-      if (bucket.remaining > 0) break; // this payment ran out mid-bucket
+      if (bucket.remaining > 0) break;
     }
 
     // Payment still has leftover after clearing everything known so far —
-    // only NOW do we push forward into a brand-new future month
+    // push forward into a brand-new future month, same as before
     if (amount > 0) {
       const last = buckets[buckets.length - 1];
       let m = last ? last.month : now.getMonth() + 1;
@@ -1119,13 +1126,12 @@ function computePaymentAllocations(customer, payments) {
         m = next.month;
         y = next.year;
 
-        const pkg = getPackageAmountForMonth(customer, m, y);
+        const pkg = getEffectivePackageForMonth(customer, m, y);
         const monthLabel = months.find((mo) => mo.number === m)?.name || m;
         const newBucket = {
           month: m,
           year: y,
           label: `${monthLabel} ${y}`,
-          amount: pkg,
           remaining: pkg,
         };
         buckets.push(newBucket);
@@ -1938,11 +1944,11 @@ function CustomerCard({
     </div>
   );
 }
+const MemoizedCustomerCard = React.memo(CustomerCard);
 
 // ======================================================
 // MONTH BALANCE
 // ======================================================
-// "Paid" column — real payment made in that calendar month
 function getMonthPaidAmount(payments, customerId, month, year) {
   return payments
     .filter((p) => {
@@ -2389,9 +2395,95 @@ function StatusPill({ status }) {
     </span>
   );
 }
+function getSortValue(
+  customer,
+  payments,
+  key,
+  monthBeforePrevious,
+  previousMonth,
+  currentMonthInfo,
+) {
+  switch (key) {
+    case "code":
+      return customer.code || "";
+    case "name":
+      return customer.name || "";
+    case "nuid":
+      return customer.nuid || "";
+    case "package":
+      return Number(customer.packageAmount || 0);
+    case "oldPaid":
+      return getMonthPaidAmount(
+        payments,
+        customer._id,
+        monthBeforePrevious.number,
+        monthBeforePrevious.year,
+      );
+    case "oldBalance":
+      return getMonthBalanceCalc(
+        customer,
+        payments,
+        monthBeforePrevious.number,
+        monthBeforePrevious.year,
+      );
+    case "previousPaid":
+      return getMonthPaidAmount(
+        payments,
+        customer._id,
+        previousMonth.number,
+        previousMonth.year,
+      );
+    case "previousBalance":
+      return getMonthBalanceCalc(
+        customer,
+        payments,
+        previousMonth.number,
+        previousMonth.year,
+      );
+    case "currentPaid":
+      return getMonthPaidAmount(
+        payments,
+        customer._id,
+        currentMonthInfo.number,
+        currentMonthInfo.year,
+      );
+    case "currentBalance":
+      return getMonthBalanceCalc(
+        customer,
+        payments,
+        currentMonthInfo.number,
+        currentMonthInfo.year,
+      );
+    default:
+      return "";
+  }
+}
+
+function SortableHeader({ label, sortKey, sortConfig, onSort, align = "left" }) {
+  const isActive = sortConfig.key === sortKey;
+  return (
+    <th
+      className={`px-4 py-4 text-${align} text-xs font-bold uppercase tracking-wide text-slate-500`}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`flex cursor-pointer items-center gap-1 transition hover:text-indigo-600 dark:hover:text-indigo-400 ${
+          align === "right" ? "ml-auto" : ""
+        } ${isActive ? "text-indigo-600 dark:text-indigo-400" : ""}`}
+      >
+        {label}
+        <span className="text-[10px]">
+          {isActive ? (sortConfig.direction === "asc" ? "▲" : "▼") : "⇅"}
+        </span>
+      </button>
+    </th>
+  );
+}
 function CustomerTableRow({
   customer,
   payments,
+  index,
   monthBeforePrevious,
   previousMonth,
   currentMonthInfo,
@@ -2458,7 +2550,13 @@ function CustomerTableRow({
     currentMonthInfo.year,
   );
   return (
-    <tr className="border-b border-slate-100 transition hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-slate-800/50">
+    <tr
+      className={`border-b border-slate-100 transition dark:border-slate-800 ${
+        index % 2 === 0
+          ? "bg-white dark:bg-slate-900"
+          : "bg-slate-50 dark:bg-slate-800/40"
+      } hover:bg-indigo-100 active:bg-indigo-200 dark:hover:bg-slate-700 dark:active:bg-slate-600`}
+    >
       {/* CHECKBOX */}
 
       <td className="w-12 px-4 py-4">
@@ -2659,6 +2757,7 @@ function CustomerTableRow({
     </tr>
   );
 }
+const MemoizedCustomerTableRow = React.memo(CustomerTableRow);
 
 // ======================================================
 // STAT CARD
@@ -3464,7 +3563,52 @@ export default function Customers() {
       return matchesSearch && matchesLocation;
     });
   }, [customers, search, selectedLocation]);
-  const displayedCustomers = filteredCustomers.slice(0, rowsPerPage);
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+
+  const toggleSort = (key) => {
+    setSortConfig((prev) =>
+      prev.key === key
+        ? { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: "asc" },
+    );
+  };
+
+  const sortedCustomers = useMemo(() => {
+    if (!sortConfig.key) return filteredCustomers;
+    const sorted = [...filteredCustomers].sort((a, b) => {
+      const va = getSortValue(
+        a,
+        payments,
+        sortConfig.key,
+        monthBeforePrevious,
+        previousMonth,
+        currentMonthInfo,
+      );
+      const vb = getSortValue(
+        b,
+        payments,
+        sortConfig.key,
+        monthBeforePrevious,
+        previousMonth,
+        currentMonthInfo,
+      );
+      if (typeof va === "string" || typeof vb === "string") {
+        return String(va).localeCompare(String(vb));
+      }
+      return va - vb;
+    });
+    if (sortConfig.direction === "desc") sorted.reverse();
+    return sorted;
+  }, [
+    filteredCustomers,
+    sortConfig,
+    payments,
+    monthBeforePrevious,
+    previousMonth,
+    currentMonthInfo,
+  ]);
+
+  const displayedCustomers = sortedCustomers.slice(0, rowsPerPage);
   const handleBulkDelete = async () => {
     if (selectedCustomers.length === 0) return;
 
@@ -3543,10 +3687,10 @@ export default function Customers() {
   }, [filteredCustomers, monthBeforePrevious, previousMonth, currentMonthInfo]);
 
   const toggleSelectAll = () => {
-    if (selectedCustomers.length === customers.length) {
+    if (selectedCustomers.length === filteredCustomers.length) {
       setSelectedCustomers([]);
     } else {
-      setSelectedCustomers(customers.map((customer) => customer._id));
+      setSelectedCustomers(filteredCustomers.map((customer) => customer._id));
     }
   };
 
@@ -3635,10 +3779,12 @@ export default function Customers() {
   // ====================================================
 
   useEffect(() => {
-    loadCustomers();
-    loadLocations();
-    loadPayments();
-    loadCollection();
+    Promise.all([
+      loadCustomers(),
+      loadLocations(),
+      loadPayments(),
+      loadCollection(),
+    ]);
   }, []);
 
   // ====================================================
@@ -3782,16 +3928,55 @@ export default function Customers() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
         <div className="mx-auto max-w-7xl p-4 sm:p-6">
-          <div className="h-16 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />
+          <div className="h-16 animate-pulse rounded-2xl bg-slate-300 dark:bg-slate-700" />
 
           <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[1, 2, 3, 4].map((item) => (
               <div
                 key={item}
-                className="h-28 animate-pulse rounded-2xl bg-white dark:bg-slate-900"
+                className="h-28 animate-pulse rounded-2xl bg-slate-300 dark:bg-slate-700"
               />
             ))}
           </div>
+
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex flex-col gap-3 lg:flex-row">
+              <div className="h-12 flex-1 animate-pulse rounded-xl bg-slate-300 dark:bg-slate-700" />
+              <div className="flex gap-2">
+                <div className="h-12 w-24 animate-pulse rounded-xl bg-slate-300 dark:bg-slate-700" />
+                <div className="hidden h-12 w-36 animate-pulse rounded-xl bg-slate-300 dark:bg-slate-700 sm:block" />
+                <div className="h-12 w-12 animate-pulse rounded-xl bg-slate-300 dark:bg-slate-700" />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between">
+            <div className="h-5 w-32 animate-pulse rounded bg-slate-300 dark:bg-slate-700" />
+            <div className="h-8 w-24 animate-pulse rounded-lg bg-slate-300 dark:bg-slate-700" />
+          </div>
+
+          {view === "table" ? (
+            <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="h-12 animate-pulse border-b border-slate-200 bg-slate-300 dark:border-slate-700 dark:bg-slate-700" />
+              <div className="space-y-3 p-4">
+                {[1, 2, 3, 4, 5].map((item) => (
+                  <div
+                    key={item}
+                    className="h-12 animate-pulse rounded-lg bg-slate-300 dark:bg-slate-700"
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
+                <div
+                  key={item}
+                  className="h-80 animate-pulse rounded-2xl bg-slate-300 dark:bg-slate-700"
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -4149,7 +4334,7 @@ export default function Customers() {
         {!error && filteredCustomers.length > 0 && view === "cards" && (
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {displayedCustomers.map((customer) => (
-              <CustomerCard
+              <MemoizedCustomerCard
                 key={customer._id}
                 customer={customer}
                 payments={payments}
@@ -4204,53 +4389,29 @@ export default function Customers() {
                 </div>
               </div>
               <table className="min-w-[1650px] w-full border-collapse text-center">
-                <thead className="bg-slate-50 dark:bg-slate-800/80">
+                                <thead className="bg-slate-50 dark:bg-slate-800/80">
                   <tr>
-                    {/* SELECT ALL */}
                     <th className="px-4 py-4">
                       <input
                         type="checkbox"
                         checked={
-                          customers.length > 0 &&
-                          selectedCustomers.length === customers.length
+                          filteredCustomers.length > 0 &&
+                          selectedCustomers.length === filteredCustomers.length
                         }
                         onChange={toggleSelectAll}
                         className="h-4 w-4 cursor-pointer accent-indigo-600"
                       />
                     </th>
-                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Code
-                    </th>
-                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Customer
-                    </th>
-                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                      NUID
-                    </th>
-                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Package
-                    </th>
-                    {/* JUNE */}
-                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
-                      {monthBeforePrevious.name} Paid
-                    </th>
-                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
-                      {monthBeforePrevious.name} Bal
-                    </th>
-                    {/* JULY */}
-                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
-                      {previousMonth.name} Paid
-                    </th>
-                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
-                      {previousMonth.name} Bal
-                    </th>
-                    {/* AUG */}
-                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
-                      {currentMonthInfo.name} Paid
-                    </th>
-                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
-                      {currentMonthInfo.name} Bal
-                    </th>
+                    <SortableHeader label="Code" sortKey="code" sortConfig={sortConfig} onSort={toggleSort} />
+                    <SortableHeader label="Customer" sortKey="name" sortConfig={sortConfig} onSort={toggleSort} />
+                    <SortableHeader label="NUID" sortKey="nuid" sortConfig={sortConfig} onSort={toggleSort} />
+                    <SortableHeader label="Package" sortKey="package" sortConfig={sortConfig} onSort={toggleSort} />
+                    <SortableHeader label={`${monthBeforePrevious.name} Paid`} sortKey="oldPaid" sortConfig={sortConfig} onSort={toggleSort} align="right" />
+                    <SortableHeader label={`${monthBeforePrevious.name} Bal`} sortKey="oldBalance" sortConfig={sortConfig} onSort={toggleSort} align="right" />
+                    <SortableHeader label={`${previousMonth.name} Paid`} sortKey="previousPaid" sortConfig={sortConfig} onSort={toggleSort} align="right" />
+                    <SortableHeader label={`${previousMonth.name} Bal`} sortKey="previousBalance" sortConfig={sortConfig} onSort={toggleSort} align="right" />
+                    <SortableHeader label={`${currentMonthInfo.name} Paid`} sortKey="currentPaid" sortConfig={sortConfig} onSort={toggleSort} align="right" />
+                    <SortableHeader label={`${currentMonthInfo.name} Bal`} sortKey="currentBalance" sortConfig={sortConfig} onSort={toggleSort} align="right" />
                     <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                       Actions
                     </th>
@@ -4258,11 +4419,12 @@ export default function Customers() {
                 </thead>
 
                 <tbody>
-                  {displayedCustomers.map((customer) => (
-                    <CustomerTableRow
+                  {displayedCustomers.map((customer, index) => (
+                    <MemoizedCustomerTableRow
                       key={customer._id}
                       customer={customer}
                       payments={payments}
+                      index={index}
                       monthBeforePrevious={monthBeforePrevious}
                       previousMonth={previousMonth}
                       currentMonthInfo={currentMonthInfo}

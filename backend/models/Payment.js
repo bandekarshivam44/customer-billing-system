@@ -22,7 +22,7 @@ const paymentAllocationSchema = new mongoose.Schema(
   },
   {
     _id: false,
-  }
+  },
 );
 
 const paymentSchema = new mongoose.Schema(
@@ -67,7 +67,7 @@ const paymentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 paymentSchema.index({

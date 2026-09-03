@@ -23,7 +23,10 @@ const getPackageForMonth = (customer, month, year) => {
 
 const getBillingStart = (customer) => {
   if (customer.billingStartMonth && customer.billingStartYear) {
-    return { month: Number(customer.billingStartMonth), year: Number(customer.billingStartYear) };
+    return {
+      month: Number(customer.billingStartMonth),
+      year: Number(customer.billingStartYear),
+    };
   }
   const d = new Date(customer.createdAt || Date.now());
   return { month: d.getMonth() + 1, year: d.getFullYear() };
@@ -34,11 +37,15 @@ const cumulativeDue = (customer, targetMonth, targetYear) => {
   const start = getBillingStart(customer);
   const targetKey = getMonthKey(targetMonth, targetYear);
   let due = 0;
-  let m = start.month, y = start.year;
+  let m = start.month,
+    y = start.year;
   while (getMonthKey(m, y) <= targetKey) {
     due += getPackageForMonth(customer, m, y);
     m++;
-    if (m > 12) { m = 1; y++; }
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
   }
   return due;
 };
@@ -57,51 +64,76 @@ const getBalanceOverride = (customer, month, year) => {
   let best = null;
   for (const o of list) {
     const k = getMonthKey(o.month, o.year);
-    if (k <= targetKey && (!best || k > getMonthKey(best.month, best.year))) best = o;
+    if (k <= targetKey && (!best || k > getMonthKey(best.month, best.year)))
+      best = o;
   }
   return best;
 };
 
 const cumulativeDueFrom = (customer, fromM, fromY, toM, toY) => {
-  let due = 0, m = fromM, y = fromY;
+  let due = 0,
+    m = fromM,
+    y = fromY;
   while (getMonthKey(m, y) <= getMonthKey(toM, toY)) {
     due += getPackageForMonth(customer, m, y);
-    m++; if (m > 12) { m = 1; y++; }
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
   }
   return due;
 };
 
 const getMonthBalance = (customer, payments, month, year) => {
   const override = getBalanceOverride(customer, month, year);
-  let base = 0, startM, startY, cutoff;
+  let base = 0,
+    startM,
+    startY,
+    cutoff;
 
   if (override) {
     if (override.month === month && override.year === year) {
       return Math.max(0, Number(override.balance || 0));
     }
     base = Number(override.balance || 0);
-    startM = override.month + 1; startY = override.year;
-    if (startM > 12) { startM = 1; startY++; }
+    startM = override.month + 1;
+    startY = override.year;
+    if (startM > 12) {
+      startM = 1;
+      startY++;
+    }
     cutoff = new Date(override.year, override.month, 1);
   } else {
     const s = getBillingStart(customer);
-    startM = s.month; startY = s.year;
+    startM = s.month;
+    startY = s.year;
     cutoff = new Date(0);
   }
 
   const due = base + cumulativeDueFrom(customer, startM, startY, month, year);
   const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
   const paid = payments
-    .filter((p) => new Date(p.paidAt) >= cutoff && new Date(p.paidAt) <= monthEnd)
+    .filter(
+      (p) => new Date(p.paidAt) >= cutoff && new Date(p.paidAt) <= monthEnd,
+    )
     .reduce((s, p) => s + Number(p.amount || 0), 0);
 
   return Math.max(0, due - paid);
 };
 
 // Builds a full month-by-month ledger for the UI table
-const buildBillingMonths = (customer, payments, startMonth, startYear, endMonth, endYear) => {
+const buildBillingMonths = (
+  customer,
+  payments,
+  startMonth,
+  startYear,
+  endMonth,
+  endYear,
+) => {
   const months = [];
-  let m = Number(startMonth), y = Number(startYear);
+  let m = Number(startMonth),
+    y = Number(startYear);
 
   while (getMonthKey(m, y) <= getMonthKey(endMonth, endYear)) {
     const pkg = getPackageForMonth(customer, m, y);
@@ -116,21 +148,38 @@ const buildBillingMonths = (customer, payments, startMonth, startYear, endMonth,
       })
       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
-    months.push({ month: m, year: y, package: pkg, paid: paidThisMonth, due, balance });
+    months.push({
+      month: m,
+      year: y,
+      package: pkg,
+      paid: paidThisMonth,
+      due,
+      balance,
+    });
 
     m++;
-    if (m > 12) { m = 1; y++; }
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
   }
   return months;
 };
 
 const recalcCustomerBalance = async (customerId) => {
-  const customer = await Customer.findById(customerId);
+  const [customer, payments] = await Promise.all([
+    Customer.findById(customerId),
+    Payment.find({ customer: customerId }).lean(),
+  ]);
   if (!customer) return 0;
 
-  const payments = await Payment.find({ customer: customerId }).lean();
   const now = new Date();
-  const balance = getMonthBalance(customer, payments, now.getMonth() + 1, now.getFullYear());
+  const balance = getMonthBalance(
+    customer,
+    payments,
+    now.getMonth() + 1,
+    now.getFullYear(),
+  );
 
   await Customer.findByIdAndUpdate(customerId, { currentBalance: balance });
   return balance;
@@ -144,8 +193,20 @@ const addPayment = async (req, res) => {
   try {
     const { customer, amount, addedBy, note, paidAt, month, year } = req.body;
 
-    if (!customer || amount === undefined || !addedBy || month === undefined || year === undefined) {
-      return res.status(400).json({ success: false, message: "Customer, amount, payment collector, month and year are required" });
+    if (
+      !customer ||
+      amount === undefined ||
+      !addedBy ||
+      month === undefined ||
+      year === undefined
+    ) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message:
+            "Customer, amount, payment collector, month and year are required",
+        });
     }
 
     const numericMonth = Number(month);
@@ -153,27 +214,49 @@ const addPayment = async (req, res) => {
     const numericAmount = Number(amount);
     const collector = String(addedBy).trim().toUpperCase();
 
-    if (!Number.isInteger(numericMonth) || numericMonth < 1 || numericMonth > 12) {
-      return res.status(400).json({ success: false, message: "Invalid payment month" });
+    if (
+      !Number.isInteger(numericMonth) ||
+      numericMonth < 1 ||
+      numericMonth > 12
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payment month" });
     }
     if (!Number.isInteger(numericYear) || numericYear < 2000) {
-      return res.status(400).json({ success: false, message: "Invalid payment year" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payment year" });
     }
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ success: false, message: "Payment amount must be greater than 0" });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Payment amount must be greater than 0",
+        });
     }
     if (!validCollectors.includes(collector)) {
-      return res.status(400).json({ success: false, message: `Invalid payment collector. Allowed collectors: ${validCollectors.join(", ")}` });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: `Invalid payment collector. Allowed collectors: ${validCollectors.join(", ")}`,
+        });
     }
 
     const customerExists = await Customer.findById(customer);
     if (!customerExists) {
-      return res.status(404).json({ success: false, message: "Customer not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Customer not found" });
     }
 
     const paymentDate = paidAt ? new Date(paidAt) : new Date();
     if (Number.isNaN(paymentDate.getTime())) {
-      return res.status(400).json({ success: false, message: "Invalid payment date" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payment date" });
     }
 
     // allocations kept only for reporting (which month the user says this covers) —
@@ -184,7 +267,9 @@ const addPayment = async (req, res) => {
       addedBy: collector,
       paidAt: paymentDate,
       note: note ? String(note).trim() : "",
-      allocations: [{ month: numericMonth, year: numericYear, amount: numericAmount }],
+      allocations: [
+        { month: numericMonth, year: numericYear, amount: numericAmount },
+      ],
     });
 
     const currentBalance = await recalcCustomerBalance(customerExists._id);
@@ -201,7 +286,12 @@ const addPayment = async (req, res) => {
     });
   } catch (error) {
     console.error("ADD PAYMENT ERROR:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to add payment" });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: error.message || "Failed to add payment",
+      });
   }
 };
 
@@ -212,17 +302,24 @@ const addPayment = async (req, res) => {
 const getCustomerBilling = async (req, res) => {
   try {
     const { customerId } = req.params;
-    const customer = await Customer.findById(customerId).populate("location", "name").lean();
-    if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
-
-    const payments = await Payment.find({ customer: customerId }).sort({ paidAt: 1 }).lean();
+    const [customer, payments] = await Promise.all([
+      Customer.findById(customerId).populate("location", "name").lean(),
+      Payment.find({ customer: customerId }).sort({ paidAt: 1 }).lean(),
+    ]);
+    if (!customer)
+      return res
+        .status(404)
+        .json({ success: false, message: "Customer not found" });
     const start = getBillingStart(customer);
     const now = new Date();
 
     const months = buildBillingMonths(
-      customer, payments,
-      start.month, start.year,
-      now.getMonth() + 1, now.getFullYear(),
+      customer,
+      payments,
+      start.month,
+      start.year,
+      now.getMonth() + 1,
+      now.getFullYear(),
     );
 
     const totalBalance = months.length ? months[months.length - 1].balance : 0;
@@ -230,7 +327,9 @@ const getCustomerBilling = async (req, res) => {
     return res.json({ success: true, customer, months, totalBalance });
   } catch (error) {
     console.error("GET CUSTOMER BILLING ERROR:", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch customer billing" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch customer billing" });
   }
 };
 
@@ -241,22 +340,38 @@ const getCustomerBilling = async (req, res) => {
 const getCustomerPayments = async (req, res) => {
   try {
     const { customerId } = req.params;
-    const customer = await Customer.findById(customerId).populate("location", "name").lean();
-    if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
+    const customer = await Customer.findById(customerId)
+      .populate("location", "name")
+      .lean();
+    if (!customer)
+      return res
+        .status(404)
+        .json({ success: false, message: "Customer not found" });
 
-    const payments = await Payment.find({ customer: customerId }).sort({ paidAt: -1, createdAt: -1 }).lean();
+    const payments = await Payment.find({ customer: customerId })
+      .sort({ paidAt: -1, createdAt: -1 })
+      .lean();
 
     const totalPaid = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
-    const rajeshTotal = payments.filter((p) => p.addedBy === "RAJESH").reduce((t, p) => t + Number(p.amount || 0), 0);
-    const shivamTotal = payments.filter((p) => p.addedBy === "SHIVAM").reduce((t, p) => t + Number(p.amount || 0), 0);
+    const rajeshTotal = payments
+      .filter((p) => p.addedBy === "RAJESH")
+      .reduce((t, p) => t + Number(p.amount || 0), 0);
+    const shivamTotal = payments
+      .filter((p) => p.addedBy === "SHIVAM")
+      .reduce((t, p) => t + Number(p.amount || 0), 0);
 
     return res.json({
-      success: true, customer, count: payments.length,
-      totals: { totalPaid, rajeshTotal, shivamTotal }, data: payments,
+      success: true,
+      customer,
+      count: payments.length,
+      totals: { totalPaid, rajeshTotal, shivamTotal },
+      data: payments,
     });
   } catch (error) {
     console.error("Get customer payments error:", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch payment history" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch payment history" });
   }
 };
 
@@ -268,7 +383,9 @@ const getMonthPayments = async (req, res) => {
   try {
     const { month, year } = req.query;
     if (!month || !year) {
-      return res.status(400).json({ success: false, message: "Month and year are required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Month and year are required" });
     }
 
     const numericMonth = Number(month);
@@ -283,10 +400,19 @@ const getMonthPayments = async (req, res) => {
 
     const total = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
-    return res.json({ success: true, month: numericMonth, year: numericYear, count: payments.length, total, data: payments });
+    return res.json({
+      success: true,
+      month: numericMonth,
+      year: numericYear,
+      count: payments.length,
+      total,
+      data: payments,
+    });
   } catch (error) {
     console.error("Get month payments error:", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch month payments" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch month payments" });
   }
 };
 
@@ -300,16 +426,35 @@ const getCurrentMonthCollection = async (req, res) => {
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    const payments = await Payment.find({ paidAt: { $gte: start, $lt: end } }).lean();
+    const payments = await Payment.find({
+      paidAt: { $gte: start, $lt: end },
+    }).lean();
 
     const total = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-    const rajesh = payments.filter((p) => p.addedBy === "RAJESH").reduce((s, p) => s + Number(p.amount || 0), 0);
-    const shivam = payments.filter((p) => p.addedBy === "SHIVAM").reduce((s, p) => s + Number(p.amount || 0), 0);
+    const rajesh = payments
+      .filter((p) => p.addedBy === "RAJESH")
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+    const shivam = payments
+      .filter((p) => p.addedBy === "SHIVAM")
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
 
-    return res.json({ success: true, month: now.getMonth() + 1, year: now.getFullYear(), total, rajesh, shivam, count: payments.length });
+    return res.json({
+      success: true,
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+      total,
+      rajesh,
+      shivam,
+      count: payments.length,
+    });
   } catch (error) {
     console.error("Get current month collection error:", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch current month collection" });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch current month collection",
+      });
   }
 };
 
@@ -325,13 +470,26 @@ const getAllPayments = async (req, res) => {
       .lean();
 
     const total = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-    const rajesh = payments.filter((p) => String(p.addedBy || "").toUpperCase() === "RAJESH").reduce((s, p) => s + Number(p.amount || 0), 0);
-    const shivam = payments.filter((p) => String(p.addedBy || "").toUpperCase() === "SHIVAM").reduce((s, p) => s + Number(p.amount || 0), 0);
+    const rajesh = payments
+      .filter((p) => String(p.addedBy || "").toUpperCase() === "RAJESH")
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+    const shivam = payments
+      .filter((p) => String(p.addedBy || "").toUpperCase() === "SHIVAM")
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
 
-    return res.json({ success: true, count: payments.length, total, rajesh, shivam, data: payments });
+    return res.json({
+      success: true,
+      count: payments.length,
+      total,
+      rajesh,
+      shivam,
+      data: payments,
+    });
   } catch (error) {
     console.error("Get all payments error:", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch payments" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch payments" });
   }
 };
 
