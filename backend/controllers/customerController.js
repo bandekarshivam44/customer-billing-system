@@ -701,7 +701,7 @@ const importCustomers = async (req, res) => {
           customer = new Customer({
             code, name, nuid, mobile, packageAmount,
             location: location._id,
-            billingStartMonth: 6,
+            billingStartMonth: 8,
             billingStartYear: 2026,
             packageHistory: [],
             balanceOverrides: [],

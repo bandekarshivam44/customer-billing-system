@@ -612,12 +612,14 @@ function PaymentModal({ customer, payments = [], onClose, onSaved }) {
   const [month, setMonth] = useState(currentMonth);
   const [year, setYear] = useState(currentYear);
   const now = new Date();
-  const currentBalance = getMonthBalanceCalc(
-    customer,
-    payments,
-    now.getMonth() + 1,
-    now.getFullYear(),
-  );
+  const currentBalance = customer
+    ? getMonthBalanceCalc(
+        customer,
+        payments,
+        now.getMonth() + 1,
+        now.getFullYear(),
+      )
+    : 0;
   const [amount, setAmount] = useState(String(customer.packageAmount || ""));
   const [addedBy, setAddedBy] = useState("RAJESH");
   const [note, setNote] = useState("");
@@ -1072,7 +1074,7 @@ function buildDueBuckets(customer, uptoMonth, uptoYear) {
 }
 
 function computePaymentAllocations(customer, payments) {
-  const now = new Date(); // swap to getNow() once the test-clock widget is wired in
+  const now = new Date();
   const buckets = buildDueBuckets(
     customer,
     now.getMonth() + 1,
@@ -1090,9 +1092,6 @@ function computePaymentAllocations(customer, payments) {
   return sorted.map((payment) => {
     let amount = Number(payment.amount || 0);
     const allocations = [];
-
-    // Skip any already-cleared buckets, then fill oldest-unpaid-first —
-    // this naturally covers a past unpaid month before ever touching the future
     while (amount > 0 && bucketIndex < buckets.length) {
       const bucket = buckets[bucketIndex];
       if (bucket.remaining <= 0) {
@@ -1703,47 +1702,43 @@ function CustomerCard({
   const outstandingMonths = breakdown.filter(
     (item) => !item.isAdjustment && item.remaining > 0,
   );
-const currentStatus =
-  customer.statusHistory?.length > 0
-    ? customer.statusHistory[customer.statusHistory.length - 1].status
-    : customer.status;
+  const currentStatus =
+    customer.statusHistory?.length > 0
+      ? customer.statusHistory[customer.statusHistory.length - 1].status
+      : customer.status;
   return (
     <div className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900">
       {/* CUSTOMER HEADER */}
-      <button
-        type="button"
-        onClick={onClick}
-        className="w-full cursor-pointer p-5 text-left"
-      >
+      <div className="w-full cursor-pointer p-5 text-left">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="mb-1 flex items-center gap-2">
               <span className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
                 {customer.code}
               </span>
-{currentStatus === "active" && (
-  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-    ACTIVE
-  </span>
-)}
+              {currentStatus === "active" && (
+                <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                  ACTIVE
+                </span>
+              )}
 
-{currentStatus === "inactive" && (
-  <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-    INACTIVE
-  </span>
-)}
+              {currentStatus === "inactive" && (
+                <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                  INACTIVE
+                </span>
+              )}
 
-{currentStatus === "free" && (
-  <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-    FREE
-  </span>
-)}
+              {currentStatus === "free" && (
+                <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  FREE
+                </span>
+              )}
 
-{currentStatus === "dc" && (
-  <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
-    DC
-  </span>
-)}
+              {currentStatus === "dc" && (
+                <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
+                  DC
+                </span>
+              )}
             </div>
 
             <h2 className="truncate text-lg font-bold text-slate-900 dark:text-white">
@@ -1824,7 +1819,7 @@ const currentStatus =
             </p>
           </div>
         </div>
-      </button>
+      </div>
 
       {/* BALANCE BREAKDOWN */}
       <div className="mx-5 mb-4 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
@@ -1887,59 +1882,59 @@ const currentStatus =
       </div>
 
       {/* ACTIONS */}
-<div className="grid grid-cols-2 gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
-  {/* PAYMENT */}
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
-      onAddPayment();
-    }}
-    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 text-sm font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98]"
-  >
-    <Plus size={16} />
-    Payment
-  </button>
+      <div className="grid grid-cols-2 gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+        {/* PAYMENT */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddPayment();
+          }}
+          className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 text-sm font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98]"
+        >
+          <Plus size={16} />
+          Payment
+        </button>
 
-  {/* EDIT */}
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
-      onEdit();
-    }}
-    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
-  >
-    <Edit3 size={16} />
-    Edit
-  </button>
+        {/* EDIT */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
+        >
+          <Edit3 size={16} />
+          Edit
+        </button>
 
-  {/* BALANCE */}
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
-      onBalance();
-    }}
-    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
-  >
-    <IndianRupee size={16} />
-    Balance
-  </button>
+        {/* BALANCE */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onBalance();
+          }}
+          className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+        >
+          <IndianRupee size={16} />
+          Balance
+        </button>
 
-  {/* DETAILS */}
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
-      onClick();
-    }}
-    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
-  >
-    <ChevronRight size={16} />
-    Details
-  </button>
-</div>
+        {/* DETAILS */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
+        >
+          <ChevronRight size={16} />
+          Details
+        </button>
+      </div>
     </div>
   );
 }
@@ -2410,23 +2405,58 @@ function CustomerTableRow({
   // --------------------------------------------
   // MONTH CALCULATIONS
   // --------------------------------------------
-  const oldMonthStatus = getStatusForMonth(customer, monthBeforePrevious.number, monthBeforePrevious.year);
-const previousMonthStatus = getStatusForMonth(customer, previousMonth.number, previousMonth.year);
-const currentMonthStatus = getStatusForMonth(customer, currentMonthInfo.number, currentMonthInfo.year);
+  const oldMonthStatus = getStatusForMonth(
+    customer,
+    monthBeforePrevious.number,
+    monthBeforePrevious.year,
+  );
+  const previousMonthStatus = getStatusForMonth(
+    customer,
+    previousMonth.number,
+    previousMonth.year,
+  );
+  const currentMonthStatus = getStatusForMonth(
+    customer,
+    currentMonthInfo.number,
+    currentMonthInfo.year,
+  );
 
-const getMonthlyEntry = (month, year) =>
-  (customer.monthlyBilling || []).find((m) => m.month === month && m.year === year);
+  const getMonthlyEntry = (month, year) =>
+    (customer.monthlyBilling || []).find(
+      (m) => m.month === month && m.year === year,
+    );
 
-const oldEntry = getMonthlyEntry(monthBeforePrevious.number, monthBeforePrevious.year);
-const previousEntry = getMonthlyEntry(previousMonth.number, previousMonth.year);
-const currentEntry = getMonthlyEntry(currentMonthInfo.number, currentMonthInfo.year);
+  const oldEntry = getMonthlyEntry(
+    monthBeforePrevious.number,
+    monthBeforePrevious.year,
+  );
+  const previousEntry = getMonthlyEntry(
+    previousMonth.number,
+    previousMonth.year,
+  );
+  const currentEntry = getMonthlyEntry(
+    currentMonthInfo.number,
+    currentMonthInfo.year,
+  );
 
-const oldMonthPaid = oldEntry?.paid ?? 0;
-const oldMonthBalance = oldEntry?.balance ?? 0;
-const previousPaid = previousEntry?.paid ?? 0;
-const previousBalance = previousEntry?.balance ?? 0;
-const currentPaid = currentEntry?.paid ?? 0;
-const currentMonthBalance = currentEntry?.balance ?? 0;
+  const oldMonthPaid = oldEntry?.paid ?? 0;
+  const oldMonthBalance = oldEntry?.balance ?? 0;
+  const previousPaid = previousEntry?.paid ?? 0;
+  const previousBalance = previousEntry?.balance ?? 0;
+
+  const currentPaid = getMonthPaidAmount(
+    payments,
+    customer._id,
+    currentMonthInfo.number,
+    currentMonthInfo.year,
+  );
+
+  const currentMonthBalance = getMonthBalanceCalc(
+    customer,
+    payments,
+    currentMonthInfo.number,
+    currentMonthInfo.year,
+  );
   return (
     <tr className="border-b border-slate-100 transition hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-slate-800/50">
       {/* CHECKBOX */}
@@ -2534,10 +2564,14 @@ const currentMonthBalance = currentEntry?.balance ?? 0;
       <td className="whitespace-nowrap px-4 py-4">
         {currentMonthStatus !== "active" && currentPaid === 0 ? (
           <StatusPill status={currentMonthStatus} />
-        ) : (
+        ) : currentPaid > 0 ? (
           <span className="font-semibold text-emerald-600">
             ₹{currentPaid.toLocaleString("en-IN")}
           </span>
+        ) : currentMonthBalance === 0 ? (
+          <span className="font-semibold text-emerald-600">PAID</span>
+        ) : (
+          <span className="font-semibold text-slate-400">₹0</span>
         )}
       </td>
       {/* CURRENT MONTH BALANCE */}
@@ -2681,15 +2715,15 @@ function StatCard({
           {title === "Customer Status" ? (
             <div className="mt-3 flex flex-col items-right gap-x-3 gap-y-1 text-sm">
               <span className="font-black text-emerald-600 dark:text-emerald-400">
-                Active - {activeCount} 
+                Active - {activeCount}
               </span>
 
               <span className="font-black text-blue-600 dark:text-blue-400">
-                Free - {freeCount} 
+                Free - {freeCount}
               </span>
 
               <span className="font-black text-red-600 dark:text-red-400">
-                DC - {inactiveCount} 
+                DC - {inactiveCount}
               </span>
             </div>
           ) : (
@@ -3465,27 +3499,48 @@ export default function Customers() {
         : [...prev, id],
     );
   };
-const tableFooterTotals = useMemo(() => {
-  const getEntry = (customer, month, year) =>
-    (customer.monthlyBilling || []).find((m) => m.month === month && m.year === year);
+  const tableFooterTotals = useMemo(() => {
+    const getEntry = (customer, month, year) =>
+      (customer.monthlyBilling || []).find(
+        (m) => m.month === month && m.year === year,
+      );
 
-  return filteredCustomers.reduce(
-    (acc, customer) => {
-      const old = getEntry(customer, monthBeforePrevious.number, monthBeforePrevious.year);
-      const prev = getEntry(customer, previousMonth.number, previousMonth.year);
-      const curr = getEntry(customer, currentMonthInfo.number, currentMonthInfo.year);
+    return filteredCustomers.reduce(
+      (acc, customer) => {
+        const old = getEntry(
+          customer,
+          monthBeforePrevious.number,
+          monthBeforePrevious.year,
+        );
+        const prev = getEntry(
+          customer,
+          previousMonth.number,
+          previousMonth.year,
+        );
+        const curr = getEntry(
+          customer,
+          currentMonthInfo.number,
+          currentMonthInfo.year,
+        );
 
-      acc.oldPaid += old?.paid ?? 0;
-      acc.oldBalance += old?.balance ?? 0;
-      acc.prevPaid += prev?.paid ?? 0;
-      acc.prevBalance += prev?.balance ?? 0;
-      acc.currPaid += curr?.paid ?? 0;
-      acc.currBalance += curr?.balance ?? 0;
-      return acc;
-    },
-    { oldPaid: 0, oldBalance: 0, prevPaid: 0, prevBalance: 0, currPaid: 0, currBalance: 0 },
-  );
-}, [filteredCustomers, monthBeforePrevious, previousMonth, currentMonthInfo]);
+        acc.oldPaid += old?.paid ?? 0;
+        acc.oldBalance += old?.balance ?? 0;
+        acc.prevPaid += prev?.paid ?? 0;
+        acc.prevBalance += prev?.balance ?? 0;
+        acc.currPaid += curr?.paid ?? 0;
+        acc.currBalance += curr?.balance ?? 0;
+        return acc;
+      },
+      {
+        oldPaid: 0,
+        oldBalance: 0,
+        prevPaid: 0,
+        prevBalance: 0,
+        currPaid: 0,
+        currBalance: 0,
+      },
+    );
+  }, [filteredCustomers, monthBeforePrevious, previousMonth, currentMonthInfo]);
 
   const toggleSelectAll = () => {
     if (selectedCustomers.length === customers.length) {
@@ -3628,42 +3683,60 @@ const tableFooterTotals = useMemo(() => {
   // STATS
   // ====================================================
   const activeCustomersList = useMemo(
-  () => customers.filter((c) => c.active !== false),
-  [customers],
-);
-const totalCustomers = activeCustomersList.length;
-const inactiveCount = customers.length - activeCustomersList.length;
-const activeCustomerIds = useMemo(
-  () => new Set(activeCustomersList.map((c) => String(c._id))),
-  [activeCustomersList],
-);
+    () => customers.filter((c) => c.active !== false),
+    [customers],
+  );
+  const totalCustomers = activeCustomersList.length;
+  const inactiveCount = customers.length - activeCustomersList.length;
+  const activeCustomerIds = useMemo(
+    () => new Set(activeCustomersList.map((c) => String(c._id))),
+    [activeCustomersList],
+  );
 
-const activePayments = useMemo(
-  () => payments.filter((p) => {
-    const pc = p.customer?._id || p.customer;
-    return activeCustomerIds.has(String(pc));
-  }),
-  [payments, activeCustomerIds],
-);
-const pendingAmount = useMemo(
-  () => activeCustomersList.reduce((sum, c) => sum + Number(c.currentBalance || 0), 0),
-  [activeCustomersList],
-);
+  const activePayments = useMemo(
+    () =>
+      payments.filter((p) => {
+        const pc = p.customer?._id || p.customer;
+        return activeCustomerIds.has(String(pc));
+      }),
+    [payments, activeCustomerIds],
+  );
+  const pendingAmount = useMemo(
+    () =>
+      activeCustomersList.reduce(
+        (sum, c) =>
+          sum +
+          getMonthBalanceCalc(
+            c,
+            payments,
+            currentMonthInfo.number,
+            currentMonthInfo.year,
+          ),
+        0,
+      ),
+    [activeCustomersList, payments, currentMonthInfo],
+  );
 
-const totalPaid = useMemo(
-  () => activePayments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
-  [activePayments],
-);
+  const totalPaid = useMemo(
+    () => activePayments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
+    [activePayments],
+  );
 
-const rajeshTotal = useMemo(
-  () => activePayments.filter((p) => p.addedBy === "RAJESH").reduce((s, p) => s + Number(p.amount || 0), 0),
-  [activePayments],
-);
+  const rajeshTotal = useMemo(
+    () =>
+      activePayments
+        .filter((p) => p.addedBy === "RAJESH")
+        .reduce((s, p) => s + Number(p.amount || 0), 0),
+    [activePayments],
+  );
 
-const shivamTotal = useMemo(
-  () => activePayments.filter((p) => p.addedBy === "SHIVAM").reduce((s, p) => s + Number(p.amount || 0), 0),
-  [activePayments],
-);
+  const shivamTotal = useMemo(
+    () =>
+      activePayments
+        .filter((p) => p.addedBy === "SHIVAM")
+        .reduce((s, p) => s + Number(p.amount || 0), 0),
+    [activePayments],
+  );
 
   const monthCollectionSummary = useMemo(() => {
     const buildSummary = (monthInfo) => {
@@ -3748,7 +3821,7 @@ const shivamTotal = useMemo(
                 Customers
               </h1>
             </div>
-            {/* <TestClockWidget /> */}
+            <TestClockWidget />
             {/* Actions */}
 
             <div className="flex items-center gap-2">
@@ -3771,15 +3844,15 @@ const shivamTotal = useMemo(
               </button>
               {/* IMPORT button*/}
 
-              {/* <button
+              <button
                 type="button"
                 onClick={() => setShowImportModal(true)}
                 className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               >
                 <Upload size={17} />
 
-                <span className=" md:inline">Import</span>
-              </button> */}
+                <span className="hidden md:inline">Import</span>
+              </button>
               {/* ADD CUSTOMER */}
 
               <button
@@ -3806,18 +3879,18 @@ const shivamTotal = useMemo(
 
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
-  icon={Users}
-  title="Total Customers"
-  value={customers.length}
-  subtitle="All registered customers"
-  iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
-/>
-       <StatCard
-  icon={UserCheck}
-  title="Customer Status"
-  customers={customers}
-  iconClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300"
-/>
+            icon={Users}
+            title="Total Customers"
+            value={customers.length}
+            subtitle="All registered customers"
+            iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
+          />
+          <StatCard
+            icon={UserCheck}
+            title="Customer Status"
+            customers={customers}
+            iconClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300"
+          />
 
           <div
             onClick={() => setShowCollectionModal(true)}
@@ -3829,28 +3902,41 @@ const shivamTotal = useMemo(
                   Total Payment Paid
                 </p>
 
-               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-  {monthCollectionSummary.current.name} Collection
-</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  {monthCollectionSummary.current.name} Collection
+                </p>
 
-<p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
-  ₹{Number(monthCollectionSummary.current.total || 0).toLocaleString("en-IN")}
-</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+                  ₹
+                  {Number(
+                    monthCollectionSummary.current.total || 0,
+                  ).toLocaleString("en-IN")}
+                </p>
 
-<div className="mt-3 space-y-1.5">
-  <div className="flex items-center justify-between gap-6">
-    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Rajesh</p>
-    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-      ₹{monthCollectionSummary.current.rajesh.toLocaleString("en-IN")}
-    </p>
-  </div>
-  <div className="flex items-center justify-between gap-6">
-    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Shivam</p>
-    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-      ₹{monthCollectionSummary.current.shivam.toLocaleString("en-IN")}
-    </p>
-  </div>
-</div>
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-6">
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      Rajesh
+                    </p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      ₹
+                      {monthCollectionSummary.current.rajesh.toLocaleString(
+                        "en-IN",
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between gap-6">
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      Shivam
+                    </p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      ₹
+                      {monthCollectionSummary.current.shivam.toLocaleString(
+                        "en-IN",
+                      )}
+                    </p>
+                  </div>
+                </div>
 
                 <p className="mt-3 text-xs font-medium text-indigo-600 dark:text-indigo-400">
                   Click to view monthly collection
@@ -4063,16 +4149,16 @@ const shivamTotal = useMemo(
         {!error && filteredCustomers.length > 0 && view === "cards" && (
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {displayedCustomers.map((customer) => (
-            <CustomerCard
-  key={customer._id}
-  customer={customer}
-  payments={payments}
-  currentMonthInfo={currentMonthInfo}
-  onClick={() => handleCustomerClick(customer)}
-  onAddPayment={() => handleAddPayment(customer)}
-  onEdit={() => handleEdit(customer)}
-  onBalance={() => handleBalance(customer)}
-/>
+              <CustomerCard
+                key={customer._id}
+                customer={customer}
+                payments={payments}
+                currentMonthInfo={currentMonthInfo}
+                onClick={() => handleCustomerClick(customer)}
+                onAddPayment={() => handleAddPayment(customer)}
+                onEdit={() => handleEdit(customer)}
+                onBalance={() => handleBalance(customer)}
+              />
             ))}
           </div>
         )}
