@@ -4164,7 +4164,7 @@ export default function Customers() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name, code, NUID or mobile..."
+                placeholder="Search Name, Code, NUID or Mobile Number..."
                 className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
               />
 
@@ -4223,7 +4223,7 @@ export default function Customers() {
 
               <button
                 type="button"
-                onClick={refreshData}
+                onClick={() => window.location.reload()}
                 className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                 title="Refresh"
               >
