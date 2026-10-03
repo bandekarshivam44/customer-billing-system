@@ -810,7 +810,7 @@ function PaymentModal({ customer, payments = [], onClose, onSaved }) {
                 className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition ${
                   addedBy === "RAJESH"
                     ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-700 hover:text-slate-700"
                 }`}
               >
                 {addedBy === "RAJESH" && (
@@ -827,7 +827,7 @@ function PaymentModal({ customer, payments = [], onClose, onSaved }) {
                 className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition ${
                   addedBy === "SHIVAM"
                     ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-700 hover:text-slate-700"
                 }`}
               >
                 {addedBy === "SHIVAM" && (
@@ -998,6 +998,163 @@ function CollectionModal({ summary, onClose }) {
     </div>
   );
 }
+function LocationSummaryModal({ summary, onClose }) {
+  const grandBalance = summary.reduce((s, l) => s + l.balance, 0);
+  const grandCollection = summary.reduce((s, l) => s + l.collectionTotal, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+              Location Breakdown
+            </p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Balance &amp; Collection by Location
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="max-h-[65vh] overflow-y-auto p-5">
+          <div className="space-y-3">
+            {summary.map((loc) => (
+              <div
+                key={loc.name}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">
+                    {loc.name}
+                  </p>
+                  <span className="text-xs font-semibold text-slate-400">
+                    {loc.customerCount} customers
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-white p-3 dark:bg-slate-900">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">
+                      Pending Balance
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-red-600">
+                      ₹{loc.balance.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white p-3 dark:bg-slate-900">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">
+                      Collected This Month
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-emerald-600">
+                      ₹{loc.collectionTotal.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                  <span>
+                    Rajesh: ₹{loc.collectionRajesh.toLocaleString("en-IN")}
+                  </span>
+                  <span>
+                    Shivam: ₹{loc.collectionShivam.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-red-600 p-4 text-white">
+              <p className="text-xs font-semibold uppercase text-red-200">
+                Total Pending (All Locations)
+              </p>
+              <p className="mt-1 text-xl font-bold">
+                ₹{grandBalance.toLocaleString("en-IN")}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-emerald-600 p-4 text-white">
+              <p className="text-xs font-semibold uppercase text-emerald-200">
+                Total Collected (All Locations)
+              </p>
+              <p className="mt-1 text-xl font-bold">
+                ₹{grandCollection.toLocaleString("en-IN")}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TransactionsModal({ payments, customerLocationMap, onClose }) {
+  const sorted = [...payments].sort(
+    (a, b) => new Date(b.paidAt) - new Date(a.paidAt),
+  );
+  const total = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+              Transactions
+            </p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              {payments.length} entries — ₹{total.toLocaleString("en-IN")}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="max-h-[65vh] divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+          {sorted.length === 0 ? (
+            <p className="p-8 text-center text-sm text-slate-400">
+              No transactions match the current filters.
+            </p>
+          ) : (
+            sorted.map((p) => {
+              const pc = p.customer?._id || p.customer;
+              const locName = customerLocationMap.get(String(pc)) || "-";
+              return (
+                <div
+                  key={p._id}
+                  className="flex items-center justify-between p-4"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      {p.customer?.name || "Unknown customer"}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {locName} · {p.addedBy} ·{" "}
+                      {new Date(p.paidAt).toLocaleDateString("en-IN")}
+                    </p>
+                  </div>
+                  <p className="shrink-0 font-bold text-emerald-600">
+                    ₹{Number(p.amount).toLocaleString("en-IN")}
+                  </p>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ======================================================
 // CUSTOMER DETAILS MODAL
 // ======================================================
@@ -2499,6 +2656,7 @@ function CustomerTableRow({
   onAddPayment,
   onEdit,
   onBalance,
+  selectedCollector = "ALL",
 }) {
   // --------------------------------------------
   // MONTH CALCULATIONS
@@ -2536,6 +2694,10 @@ function CustomerTableRow({
     currentMonthInfo.number,
     currentMonthInfo.year,
   );
+  const scopedPayments =
+    selectedCollector === "ALL"
+      ? payments
+      : payments.filter((p) => p.addedBy === selectedCollector);
 
   const oldMonthPaid = oldEntry?.paid ?? 0;
   const oldMonthBalance = oldEntry?.balance ?? 0;
@@ -2543,7 +2705,7 @@ function CustomerTableRow({
   const previousBalance = previousEntry?.balance ?? 0;
 
   const currentPaid = getMonthPaidAmount(
-    payments,
+    scopedPayments,
     customer._id,
     currentMonthInfo.number,
     currentMonthInfo.year,
@@ -3252,7 +3414,7 @@ function CustomerFormModal({ customer, locations, onClose, onSaved }) {
                   className={`rounded-xl border px-3 py-3 text-sm font-bold transition ${
                     form.status === opt.value
                       ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-400"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 hover:text-slate-700"
                   }`}
                 >
                   {opt.label}
@@ -3354,38 +3516,351 @@ function CustomerFormModal({ customer, locations, onClose, onSaved }) {
     </div>
   );
 }
+const normKey = (k) => String(k).trim().toLowerCase().replace(/[\s_\-]/g, "");
+const cleanText = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
+
+const parseAmount = (v) => {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return v;
+  const text = String(v).replace(/[₹,\s]/g, "");
+  return text === "" ? null : Number(text);
+};
+
+const STATUS_WORD = {
+  dc: "inactive",
+  inactive: "inactive",
+  free: "free",
+  active: "active",
+};
+const statusOf = (v) =>
+  typeof v === "string" ? STATUS_WORD[v.trim().toLowerCase()] || null : null;
+
+// Turns sheet rows into clean rows for the month `prev` (last month)
+function parseImportRows(rawRows, prev) {
+  const tag = `${months[prev.getMonth()].short}${prev.getFullYear()}`.toLowerCase();
+
+  return rawRows.map((raw, i) => {
+    const flat = {};
+    Object.entries(raw).forEach(([k, v]) => {
+      flat[normKey(k)] = v;
+    });
+    const get = (...names) => {
+      for (const n of names) {
+        if (flat[n] !== undefined && flat[n] !== "") return flat[n];
+      }
+      return "";
+    };
+
+    const row = { rowNumber: i + 2, errors: [] };
+    row.code = cleanText(get("code")).toUpperCase();
+    row.name = cleanText(get("name")).toUpperCase();
+    row.nuid = cleanText(get("nuid")).toUpperCase();
+    row.location = cleanText(get("location"));
+    row.addedBy = cleanText(get("addedby", "collectedby")).toUpperCase() || "RAJESH";
+
+    const pack = parseAmount(get("packageamount", "package"));
+    row.packageAmount = pack === null ? 0 : pack;
+
+    const paidRaw = flat[`${tag}paid`];
+    const balRaw = flat[`${tag}balance`] ?? flat[`${tag}bal`];
+
+    // status from the cells: DC / FREE typed in Paid or Balance
+    const words = [...new Set([statusOf(paidRaw), statusOf(balRaw)].filter(Boolean))];
+    if (words.length > 1) row.errors.push(`Conflicting status: ${words.join(" / ")}`);
+    row.status = words[0] || "active";
+
+    row.paid = statusOf(paidRaw) ? null : parseAmount(paidRaw ?? "");
+    row.balance = statusOf(balRaw) ? null : parseAmount(balRaw ?? "");
+
+    if (!row.code || !row.name) row.errors.push("Code and name are required");
+    if (!Number.isFinite(row.packageAmount) || row.packageAmount < 0)
+      row.errors.push("Invalid package amount");
+    if (row.paid !== null && (!Number.isFinite(row.paid) || row.paid < 0))
+      row.errors.push("Invalid Paid amount");
+    if (row.balance !== null && (!Number.isFinite(row.balance) || row.balance < 0))
+      row.errors.push("Invalid Balance amount");
+    if (!["RAJESH", "SHIVAM"].includes(row.addedBy))
+      row.errors.push(`Invalid addedBy "${row.addedBy}"`);
+
+    row.paid = row.paid ?? 0; // blank Paid = 0
+
+    // adjustment so that: due + adjustment - paid = Balance (at the end of last month)
+    const eff = row.status === "active" ? row.packageAmount : 0;
+    row.adjustment =
+      row.balance === null
+        ? 0
+        : row.balance > 0
+          ? row.balance - eff + row.paid
+          : Math.min(0, row.paid - eff);
+
+    return row;
+  });
+}
+
+async function runPool(items, worker, size = 3) {
+  let next = 0;
+  const runners = Array.from({ length: size }, async () => {
+    while (next < items.length) {
+      const item = items[next++];
+      await worker(item);
+    }
+  });
+  await Promise.all(runners);
+}
+
 // ======================================================
 // IMPORT MODAL
 // ======================================================
-
-function ImportCustomersModal({ onClose, onImported }) {
+function ImportCustomersModal({ locations = [], onClose, onImported }) {
   const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [result, setResult] = useState(null);
 
+  // ---------- Download a ready-to-fill template ----------
+  const downloadTemplate = () => {
+    const today = new Date();
+    const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const prevLabel = `${months[prev.getMonth()].short} ${prev.getFullYear()}`;
+    const prevName = `${months[prev.getMonth()].name} ${prev.getFullYear()}`;
+    const currName = `${months[today.getMonth()].name} ${today.getFullYear()}`;
+    const sampleLocation = locations[0]?.name || "YOUR LOCATION NAME";
+
+    const headers = [
+      "code",
+      "name",
+      "nuid",
+      "packageAmount",
+      "location",
+      "addedBy",
+      `${prevLabel} Paid`,
+      `${prevLabel} Balance`,
+    ];
+    const samples = [
+      ["C001", "RAMESH NAIK", "N12345", 500, sampleLocation, "RAJESH", 300, 200],
+      ["C002", "SURESH PAI", "N12346", 500, sampleLocation, "RAJESH", "DC", ""],
+      ["C003", "MEENA SHETTY", "N12347", 500, sampleLocation, "SHIVAM", "FREE", ""],
+    ];
+
+    const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...samples]);
+    dataSheet["!cols"] = headers.map((h) => ({ wch: Math.max(14, h.length + 2) }));
+
+    const instructions = XLSX.utils.aoa_to_sheet([
+      ["Column", "Required", "What to enter"],
+      ["code", "Yes", "Unique customer code. Existing codes are skipped."],
+      ["name", "Yes", "Customer name (saved in capitals)."],
+      ["nuid", "No", "NUID."],
+      ["packageAmount", "Yes", "Monthly package in rupees."],
+      ["location", "Yes", "Must match a location name exactly (see the Locations sheet)."],
+      ["addedBy", "No", "Who collected the payment: RAJESH (default) or SHIVAM."],
+      [`${prevLabel} Paid`, "No", `Amount paid in ${prevName}, or type DC or FREE.`],
+      [`${prevLabel} Balance`, "No", `Amount still outstanding at the END of ${prevName}.`],
+      [],
+      ["Status is set automatically from the month cells", "", ""],
+      ["", "A number", "Customer is ACTIVE."],
+      ["", "DC", "Customer is DC (inactive)."],
+      ["", "FREE", "Customer is FREE."],
+      [],
+      ["", "", `Billing starts from ${prevName}. ${currName}'s balance is calculated automatically.`],
+      ["", "", "Keep the Customers sheet first. Only the first sheet is imported."],
+    ]);
+    instructions["!cols"] = [{ wch: 44 }, { wch: 22 }, { wch: 90 }];
+
+    const locationSheet = XLSX.utils.aoa_to_sheet([
+      ["Valid locations"],
+      ...locations.map((l) => [l.name]),
+    ]);
+    locationSheet["!cols"] = [{ wch: 30 }];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, dataSheet, "Customers");
+    XLSX.utils.book_append_sheet(workbook, instructions, "Instructions");
+    XLSX.utils.book_append_sheet(workbook, locationSheet, "Locations");
+    XLSX.writeFile(workbook, "customer-import-template.xlsx");
+  };
+
+  // ---------- The import ----------
   const handleImport = async () => {
     if (!file) {
       alert("Select an Excel file first");
       return;
     }
 
+    setRunning(true);
+    setResult(null);
+    const out = { created: 0, skipped: [], errors: [], payments: 0, adjustments: 0, abort: null };
+
     try {
-      setUploading(true);
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const rawRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      if (!rawRows.length) {
+        alert("The uploaded file is empty");
+        return;
+      }
 
-      const formData = new FormData();
+      const now = new Date();
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const pm = prev.getMonth() + 1;
+      const py = prev.getFullYear();
 
-      formData.append("file", file);
+      const parsed = parseImportRows(rawRows, prev);
+      const existing = new Set(
+        ((await api.get("/customers")).data?.data || []).map((c) =>
+          String(c.code).toUpperCase(),
+        ),
+      );
+      const locMap = new Map(
+        locations.map((l) => [cleanText(l.name).toLowerCase(), l._id]),
+      );
 
-      const response = await api.post("/customers/import", formData);
+      const todo = [];
+      const seen = new Set();
+      parsed.forEach((row) => {
+        const fail = (message) =>
+          out.errors.push({ row: row.rowNumber, code: row.code, message });
+        if (row.errors.length) return fail(row.errors.join("; "));
+        const locId = locMap.get(row.location.toLowerCase());
+        if (!locId) return fail(`Location "${row.location}" not found`);
+        if (existing.has(row.code) || seen.has(row.code)) {
+          out.skipped.push({ row: row.rowNumber, code: row.code, reason: "Code already exists" });
+          return;
+        }
+        seen.add(row.code);
+        row.locId = locId;
+        todo.push(row);
+      });
 
-      setResult(response.data);
+      // one customer = the same calls your screens make
+      const importOne = async (row) => {
+        const payload = (status) => ({
+          code: row.code,
+          name: row.name,
+          nuid: row.nuid,
+          mobile: "",
+          packageAmount: row.packageAmount,
+          billingStartMonth: pm,
+          billingStartYear: py,
+          location: row.locId,
+          active: true,
+          status,
+          statusMonth: pm,
+          statusYear: py,
+        });
+
+        const res = await api.post("/customers", payload("active"));
+        let id = (res.data?.data ?? res.data?.customer ?? res.data)?._id;
+        if (!id) {
+          const list = (await api.get("/customers")).data?.data || [];
+          id = list.find((c) => String(c.code).toUpperCase() === row.code)?._id;
+        }
+        if (!id) throw new Error("Customer was created but its id could not be read");
+
+        try {
+          if (row.status !== "active") {
+            await api.put(`/customers/${id}`, payload(row.status));
+          }
+          let payments = 0;
+          let adjustments = 0;
+          if (row.paid > 0) {
+            await api.post("/payments", {
+              customer: id,
+              month: pm,
+              year: py,
+              amount: row.paid,
+              addedBy: row.addedBy,
+              note: "Imported",
+              paidAt: new Date(py, pm - 1, 15, 12, 0, 0).toISOString(),
+            });
+            payments = 1;
+          }
+          if (row.adjustment !== 0) {
+            await api.post(`/customers/${id}/balance-adjustments`, {
+              month: pm,
+              year: py,
+              type: row.adjustment > 0 ? "add" : "deduct",
+              amount: Math.abs(row.adjustment),
+              reason: "Imported opening balance",
+              paidAt: new Date().toISOString(),
+            });
+            adjustments = 1;
+          }
+          return { id, payments, adjustments };
+        } catch (e) {
+          await api.delete(`/customers/${id}`).catch(() => {});
+          throw e;
+        }
+      };
+
+      // read the first customer back and compare with what we meant to save
+      const verify = async (id, row) => {
+        const problems = [];
+        const c = (await api.get(`/customers/${id}`)).data?.data;
+        if (Number(c?.billingStartMonth) !== pm || Number(c?.billingStartYear) !== py)
+          problems.push(`Billing start was saved as ${c?.billingStartMonth}/${c?.billingStartYear}, expected ${pm}/${py}`);
+        if (row.status !== "active" && c?.status !== row.status)
+          problems.push(`Status was saved as "${c?.status}", expected "${row.status}"`);
+        if (row.adjustment !== 0 && !(c?.balanceOverrides?.length > 0))
+          problems.push("The balance adjustment was not saved");
+        if (row.paid > 0) {
+          const pays = (await api.get(`/payments/customer/${id}`)).data?.data || [];
+          const d = pays[0] ? new Date(pays[0].paidAt) : null;
+          if (!d) problems.push("The payment was not saved");
+          else if (d.getMonth() + 1 !== pm || d.getFullYear() !== py)
+            problems.push(`Payment date was saved as ${d.toLocaleDateString("en-IN")}, expected 15/${pm}/${py}`);
+        }
+        return problems;
+      };
+
+      setProgress({ done: 0, total: todo.length });
+      let done = 0;
+      const tick = () => setProgress({ done: ++done, total: todo.length });
+
+      if (todo.length) {
+        const first = Math.max(0, todo.findIndex((r) => r.paid > 0));
+        const [canary] = todo.splice(first, 1);
+        try {
+          const r = await importOne(canary);
+          const problems = await verify(r.id, canary);
+          if (problems.length) {
+            await api.delete(`/customers/${r.id}`).catch(() => {});
+            out.abort = problems;
+          } else {
+            out.created++;
+            out.payments += r.payments;
+            out.adjustments += r.adjustments;
+            tick();
+          }
+        } catch (e) {
+          out.abort = [e.response?.data?.message || e.message];
+        }
+
+        if (!out.abort) {
+          await runPool(todo, async (row) => {
+            try {
+              const r = await importOne(row);
+              out.created++;
+              out.payments += r.payments;
+              out.adjustments += r.adjustments;
+            } catch (e) {
+              out.errors.push({
+                row: row.rowNumber,
+                code: row.code,
+                message: e.response?.data?.message || e.message,
+              });
+            } finally {
+              tick();
+            }
+          });
+        }
+      }
 
       await onImported();
-    } catch (error) {
-      console.error(error);
-      alert(error.response?.data?.message || "Import failed");
+    } catch (e) {
+      console.error(e);
+      out.errors.push({ row: "-", code: "", message: e.response?.data?.message || e.message });
     } finally {
-      setUploading(false);
+      setResult(out);
+      setRunning(false);
     }
   };
 
@@ -3397,38 +3872,44 @@ function ImportCustomersModal({ onClose, onImported }) {
             <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
               Bulk Import
             </p>
-
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               Import Customers
             </h2>
           </div>
-
           <button
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            disabled={running}
+            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="space-y-4 p-5">
+        <div className="max-h-[75vh] space-y-4 overflow-y-auto p-5">
+          <button
+            type="button"
+            onClick={downloadTemplate}
+            disabled={running}
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300"
+          >
+            <Download size={17} />
+            Download Template
+          </button>
+
           <label
             htmlFor="excel-file-upload"
             className="block cursor-pointer rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center transition-all hover:border-emerald-400 hover:bg-emerald-50/50 dark:border-slate-700 dark:hover:border-emerald-500 dark:hover:bg-emerald-500/5"
           >
             <FileSpreadsheet size={40} className="mx-auto text-emerald-600" />
-
-            <p className="mt-3 font-bold text-slate-900 dark:text-white">
-              Select Excel file
-            </p>
+            <p className="mt-3 font-bold text-slate-900 dark:text-white">Select Excel file</p>
             <p className="mt-4 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
               Click anywhere here to choose a file
             </p>
-
             <input
               id="excel-file-upload"
               type="file"
               accept=".xlsx,.xls,.csv"
+              disabled={running}
               onChange={(e) => setFile(e.target.files?.[0] || null)}
               className="hidden"
             />
@@ -3440,31 +3921,77 @@ function ImportCustomersModal({ onClose, onImported }) {
             </div>
           )}
 
-          {result?.summary && (
-            <div className="rounded-2xl bg-emerald-50 p-4 text-sm dark:bg-emerald-950">
-              <p className="font-bold text-emerald-700 dark:text-emerald-300">
-                Import completed
+          {running && (
+            <div className="rounded-xl bg-indigo-50 p-3 text-sm dark:bg-indigo-950">
+              <p className="font-bold text-indigo-700 dark:text-indigo-300">
+                Importing {progress.done} / {progress.total} ... please keep this window open
               </p>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-900">
+                <div
+                  className="h-full bg-indigo-600 transition-all"
+                  style={{
+                    width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
+          {result?.abort && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm dark:border-red-900 dark:bg-red-950">
+              <p className="font-bold text-red-700 dark:text-red-300">
+                Import stopped - the first customer was not saved correctly
+              </p>
+              <ul className="mt-2 list-disc pl-5 text-xs text-red-700 dark:text-red-300">
+                {result.abort.map((p, i) => (
+                  <li key={i}>{p}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-red-600">
+                Nothing was imported. Send me these lines.
+              </p>
+            </div>
+          )}
+
+          {result && !result.abort && (
+            <div className="rounded-2xl bg-emerald-50 p-4 text-sm dark:bg-emerald-950">
+              <p className="font-bold text-emerald-700 dark:text-emerald-300">Import completed</p>
               <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                 <div>
-                  <p className="text-xs">Created</p>
-
-                  <p className="font-bold">{result.summary.created}</p>
+                  <p className="text-xs">Imported</p>
+                  <p className="font-bold">{result.created}</p>
                 </div>
-
-                <div>
-                  <p className="text-xs">Updated</p>
-
-                  <p className="font-bold">{result.summary.updated}</p>
-                </div>
-
                 <div>
                   <p className="text-xs">Skipped</p>
-
-                  <p className="font-bold">{result.summary.skipped}</p>
+                  <p className="font-bold">{result.skipped.length}</p>
+                </div>
+                <div>
+                  <p className="text-xs">Errors</p>
+                  <p className="font-bold">{result.errors.length}</p>
                 </div>
               </div>
+              <p className="mt-2 text-center text-xs text-slate-500">
+                {result.payments} payments and {result.adjustments} balance adjustments created
+              </p>
+              {result.skipped.length > 0 && (
+                <ul className="mt-3 max-h-24 overflow-y-auto text-xs text-amber-700">
+                  {result.skipped.map((s, i) => (
+                    <li key={i}>
+                      Row {s.row} ({s.code}): {s.reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {result.errors.length > 0 && (
+                <ul className="mt-3 max-h-32 overflow-y-auto text-xs text-red-600">
+                  {result.errors.map((e, i) => (
+                    <li key={i}>
+                      Row {e.row}
+                      {e.code ? ` (${e.code})` : ""}: {e.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -3472,20 +3999,19 @@ function ImportCustomersModal({ onClose, onImported }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold dark:border-slate-700"
+              disabled={running}
+              className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold disabled:opacity-50 dark:border-slate-700"
             >
               Close
             </button>
-
             <button
               type="button"
               onClick={handleImport}
-              disabled={!file || uploading}
+              disabled={!file || running}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white disabled:opacity-50"
             >
               <Upload size={17} />
-
-              {uploading ? "Importing..." : "Import Customers"}
+              {running ? "Importing..." : "Import Customers"}
             </button>
           </div>
         </div>
@@ -3521,6 +4047,9 @@ export default function Customers() {
   });
   const [search, setSearch] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("ALL");
+  const [selectedCollector, setSelectedCollector] = useState("ALL");
+  const [showLocationSummary, setShowLocationSummary] = useState(false);
+  const [showTransactions, setShowTransactions] = useState(false);
 
   const [view, setView] = useState(
     () => localStorage.getItem("customerView") || "cards",
@@ -3545,7 +4074,22 @@ export default function Customers() {
   // ====================================================
   // FILTER
   // ====================================================
-
+  // Customers who have at least one payment by the selected collector in the CURRENT month
+  const collectorCustomerIds = useMemo(() => {
+    if (selectedCollector === "ALL") return null; // null = no collector filtering
+    const ids = new Set();
+    payments.forEach((p) => {
+      if (p.addedBy !== selectedCollector) return;
+      const d = new Date(p.paidAt);
+      if (
+        d.getMonth() + 1 === currentMonthInfo.number &&
+        d.getFullYear() === currentMonthInfo.year
+      ) {
+        ids.add(String(p.customer?._id || p.customer));
+      }
+    });
+    return ids;
+  }, [payments, selectedCollector, currentMonthInfo]);
   const filteredCustomers = useMemo(() => {
     const query = search.trim().toLowerCase();
     return customers.filter((customer) => {
@@ -3566,9 +4110,12 @@ export default function Customers() {
         selectedLocation === "ALL" ||
         customer.location?._id === selectedLocation;
 
-      return matchesSearch && matchesLocation;
+      const matchesCollector =
+        !collectorCustomerIds || collectorCustomerIds.has(String(customer._id));
+
+      return matchesSearch && matchesLocation && matchesCollector;
     });
-  }, [customers, search, selectedLocation]);
+  }, [customers, search, selectedLocation, collectorCustomerIds]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
   const toggleSort = (key) => {
@@ -3703,14 +4250,11 @@ export default function Customers() {
   // ====================================================
   // LOAD CUSTOMERS
   // ====================================================
-
-  const loadCustomers = async () => {
+  const loadCustomers = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
-
       const response = await api.get("/customers");
-
       setCustomers(response.data.data || []);
     } catch (error) {
       console.error("Failed to load customers:", error);
@@ -3926,6 +4470,98 @@ export default function Customers() {
       current: buildSummary(currentMonthInfo),
     };
   }, [activePayments, monthBeforePrevious, previousMonth, currentMonthInfo]);
+
+  const customerLocationMap = useMemo(() => {
+    const map = new Map();
+    customers.forEach((c) => {
+      map.set(String(c._id), c.location?.name || "Unassigned");
+    });
+    return map;
+  }, [customers]);
+
+  const locationSummary = useMemo(() => {
+    const byLocation = new Map();
+    const blank = (name) => ({
+      name,
+      customerCount: 0,
+      balance: 0,
+      collectionTotal: 0,
+      collectionRajesh: 0,
+      collectionShivam: 0,
+    });
+
+    activeCustomersList.forEach((c) => {
+      const locName = c.location?.name || "Unassigned";
+      if (!byLocation.has(locName)) byLocation.set(locName, blank(locName));
+      const entry = byLocation.get(locName);
+      entry.customerCount += 1;
+      entry.balance += getMonthBalanceCalc(
+        c,
+        payments,
+        currentMonthInfo.number,
+        currentMonthInfo.year,
+      );
+    });
+
+    activePayments.forEach((p) => {
+      const d = new Date(p.paidAt);
+      if (
+        d.getMonth() + 1 !== currentMonthInfo.number ||
+        d.getFullYear() !== currentMonthInfo.year
+      )
+        return;
+      const pc = p.customer?._id || p.customer;
+      const locName = customerLocationMap.get(String(pc)) || "Unassigned";
+      if (!byLocation.has(locName)) byLocation.set(locName, blank(locName));
+      const entry = byLocation.get(locName);
+      const amt = Number(p.amount || 0);
+      entry.collectionTotal += amt;
+      if (p.addedBy === "RAJESH") entry.collectionRajesh += amt;
+      if (p.addedBy === "SHIVAM") entry.collectionShivam += amt;
+    });
+
+    return Array.from(byLocation.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [
+    activeCustomersList,
+    activePayments,
+    payments,
+    currentMonthInfo,
+    customerLocationMap,
+  ]);
+
+  // One list drives the banner total, the count AND the Transactions modal
+  const transactionPayments = useMemo(() => {
+    const locByCustomer = new Map(
+      customers.map((c) => [String(c._id), c.location?._id]),
+    );
+    return activePayments.filter((p) => {
+      const pc = String(p.customer?._id || p.customer);
+      const d = new Date(p.paidAt);
+      const locOk =
+        selectedLocation === "ALL" ||
+        locByCustomer.get(pc) === selectedLocation;
+      const collectorOk =
+        selectedCollector === "ALL" || p.addedBy === selectedCollector;
+      const monthOk =
+        d.getMonth() + 1 === currentMonthInfo.number &&
+        d.getFullYear() === currentMonthInfo.year;
+      return locOk && collectorOk && monthOk;
+    });
+  }, [
+    activePayments,
+    customers,
+    selectedLocation,
+    selectedCollector,
+    currentMonthInfo,
+  ]);
+
+  const filteredCollectionTotal = useMemo(
+    () => transactionPayments.reduce((s, p) => s + Number(p.amount || 0), 0),
+    [transactionPayments],
+  );
+
   // ====================================================
   // LOADING
   // ====================================================
@@ -4014,33 +4650,51 @@ export default function Customers() {
             </div>
             {/* <TestClockWidget /> */}
             {/* Actions */}
-
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               {/* DARK MODE */}
               <button
                 type="button"
                 onClick={toggleTheme}
                 title={dark ? "Switch to light mode" : "Switch to dark mode"}
-                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="flex cursor-pointer items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 hover:text-slate-700"
               >
-                {dark ? <Sun size={19} /> : <Moon size={19} />}
+                {dark ? (
+                  <>
+                    <Sun size={17} />
+                    <span className="hidden md:inline">Dark</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon size={19} />
+                    <span className="hidden md:inline">Light</span>
+                  </>
+                )}
               </button>
+              {/* MONTHLY PAYMNET VIEW button*/}
               <button
                 type="button"
+                onClick={() => setShowLocationSummary(true)}
+                className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 hover:text-slate-700"
+              >
+                <CalendarDays size={17} />
+                <span className="hidden md:inline">Monthly Payments</span>
+              </button>
+              {/* LOCATION ASSIGN button*/}
+              {/* <button
+                type="button"
                 onClick={() => setShowBulkAssign(true)}
-                className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="flex cursor-pointer items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 hover:text-slate-700"
               >
                 <MapPin size={17} />
-                <span className="hidden md:inline">Bulk Assignn</span>
-              </button>
+                <span className="hidden md:inline">By Location</span>
+              </button> */}
               {/* IMPORT button*/}
-
               <button
                 type="button"
                 onClick={() => setShowImportModal(true)}
-                className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="flex cursor-pointer items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 hover:text-slate-700"
               >
-                <Upload size={17} />
+                <Download size={17} />
 
                 <span className="hidden md:inline">Import</span>
               </button>
@@ -4052,13 +4706,11 @@ export default function Customers() {
                   setEditingCustomer(null);
                   setShowCustomerForm(true);
                 }}
-                className="flex cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
+                className="flex cursor-pointer items-center gap-1 rounded-xl bg-indigo-600 px-3.5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
               >
                 <UserPlus size={18} />
 
                 <span className="hidden sm:inline">Add Customer</span>
-
-                <span className="sm:hidden">Add</span>
               </button>
             </div>
           </div>
@@ -4235,19 +4887,17 @@ export default function Customers() {
           {/* FILTER */}
 
           {showFilters && (
-            <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+            <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <label className="text-sm font-semibold text-slate-600 dark:text-slate-300">
                   Location
                 </label>
-
                 <select
                   value={selectedLocation}
                   onChange={(e) => setSelectedLocation(e.target.value)}
                   className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 >
                   <option value="ALL">All Locations</option>
-
                   {locations.map((location) => (
                     <option key={location._id} value={location._id}>
                       {location.name}
@@ -4255,6 +4905,35 @@ export default function Customers() {
                   ))}
                 </select>
               </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <label className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                  Collector
+                </label>
+                <select
+                  value={selectedCollector}
+                  onChange={(e) => setSelectedCollector(e.target.value)}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                >
+                  <option value="ALL">All Collectors</option>
+                  <option value="RAJESH">Rajesh</option>
+                  <option value="SHIVAM">Shivam</option>
+                </select>
+              </div>
+
+              {(selectedLocation !== "ALL" || selectedCollector !== "ALL") && (
+                <button
+                  type="button"
+                  onClick={() => setShowTransactions(true)}
+                  className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+                >
+                  {currentMonthInfo.name} collection: ₹
+                  {filteredCollectionTotal.toLocaleString("en-IN")}{" "}
+                  <span className="font-normal">
+                    ({transactionPayments.length} payments) · View entries
+                  </span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -4387,7 +5066,7 @@ export default function Customers() {
                     onClick={() => setShowExportModal(true)}
                     className="flex cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    <Download size={17} />
+                    <Upload size={17} />
                     Export
                     {selectedCustomers.length > 0 &&
                       ` (${selectedCustomers.length})`}
@@ -4496,6 +5175,7 @@ export default function Customers() {
                       onAddPayment={() => handleAddPayment(customer)}
                       onEdit={() => handleEdit(customer)}
                       onBalance={() => handleBalance(customer)}
+                      selectedCollector={selectedCollector}
                     />
                   ))}
                 </tbody>
@@ -4620,11 +5300,28 @@ export default function Customers() {
         )}
         {showImportModal && (
           <ImportCustomersModal
+            locations={locations}
             onClose={() => setShowImportModal(false)}
             onImported={async () => {
-              setShowImportModal(false);
-              await loadCustomers();
+              await Promise.all([
+                loadCustomers(true),
+                loadPayments(),
+                loadCollection(),
+              ]);
             }}
+          />
+        )}
+        {showLocationSummary && (
+          <LocationSummaryModal
+            summary={locationSummary}
+            onClose={() => setShowLocationSummary(false)}
+          />
+        )}
+        {showTransactions && (
+          <TransactionsModal
+            payments={transactionPayments}
+            customerLocationMap={customerLocationMap}
+            onClose={() => setShowTransactions(false)}
           />
         )}
         {/* ================================================= */}
@@ -4642,7 +5339,9 @@ export default function Customers() {
             </h2>
 
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Try a different name, code, NUID or location.
+              {selectedCollector !== "ALL"
+                ? `No payments by ${selectedCollector === "RAJESH" ? "Rajesh" : "Shivam"} in ${currentMonthInfo.name}.`
+                : "Try a different name, code, NUID or location."}
             </p>
           </div>
         )}
