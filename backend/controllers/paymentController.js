@@ -296,6 +296,107 @@ const addPayment = async (req, res) => {
 };
 
 // ============================
+// UPDATE PAYMENT
+// ============================
+
+const updatePayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, addedBy, note, month, year } = req.body;
+
+    const payment = await Payment.findById(id);
+    if (!payment) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Payment not found" });
+    }
+
+    const numericMonth = Number(month);
+    const numericYear = Number(year);
+    const numericAmount = Number(amount);
+    const collector = String(addedBy || "").trim().toUpperCase();
+
+    if (!Number.isInteger(numericMonth) || numericMonth < 1 || numericMonth > 12) {
+      return res.status(400).json({ success: false, message: "Invalid payment month" });
+    }
+    if (!Number.isInteger(numericYear) || numericYear < 2000) {
+      return res.status(400).json({ success: false, message: "Invalid payment year" });
+    }
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount must be greater than 0",
+      });
+    }
+    if (!validCollectors.includes(collector)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid payment collector. Allowed collectors: ${validCollectors.join(", ")}`,
+      });
+    }
+
+    // paidAt is intentionally NOT changed, so the payment stays in its original month
+    payment.amount = numericAmount;
+    payment.addedBy = collector;
+    payment.note = note ? String(note).trim() : "";
+    payment.allocations = [
+      { month: numericMonth, year: numericYear, amount: numericAmount },
+    ];
+    await payment.save();
+
+    const currentBalance = await recalcCustomerBalance(payment.customer);
+
+    const populatedPayment = await Payment.findById(payment._id)
+      .populate("customer", "code name packageAmount")
+      .lean();
+
+    return res.json({
+      success: true,
+      message: "Payment updated successfully",
+      data: populatedPayment,
+      currentBalance,
+    });
+  } catch (error) {
+    console.error("UPDATE PAYMENT ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update payment",
+    });
+  }
+};
+
+// ============================
+// DELETE PAYMENT
+// ============================
+
+const deletePayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const payment = await Payment.findByIdAndDelete(id);
+    if (!payment) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Payment not found" });
+    }
+
+    const currentBalance = await recalcCustomerBalance(payment.customer);
+
+    return res.json({
+      success: true,
+      message: "Payment deleted successfully",
+      currentBalance,
+    });
+  } catch (error) {
+    console.error("DELETE PAYMENT ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to delete payment",
+    });
+  }
+};
+
+// ============================
 // GET CUSTOMER BILLING (for the details page table)
 // ============================
 
@@ -495,6 +596,8 @@ const getAllPayments = async (req, res) => {
 
 module.exports = {
   addPayment,
+  updatePayment,
+  deletePayment,
   getCustomerBilling,
   getCustomerPayments,
   getMonthPayments,

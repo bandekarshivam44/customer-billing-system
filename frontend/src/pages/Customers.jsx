@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import {
@@ -369,22 +369,48 @@ function BalanceModal({ customer, payments = [], onClose, onSaved }) {
   const [reason, setReason] = useState("");
 
   const now = new Date();
-  const currentBalance = getMonthBalanceCalc(
+
+ const currentBalance = useMemo(() => {
+  if (!customer) return 0;
+  return getMonthBalanceCalc(
     customer,
     payments,
     now.getMonth() + 1,
     now.getFullYear(),
   );
-  const dueBreakdown = getFullDueBreakdownWithStatus(customer, payments).filter(
-    (d) => {
-      if (d.isAdjustment) return true;
-      const cutoff = new Date();
-      cutoff.setMonth(cutoff.getMonth() - 6);
-      return new Date(d.year, d.month - 1, 1) >= cutoff;
-    },
-  );
-  const target = getEarliestUnresolvedMonth(customer, payments);
-  const targetLabel = `${months.find((m) => m.number === target.month)?.name} ${target.year}`;
+}, [customer, payments]);
+
+  const dueBreakdown = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - 6);
+
+    return getFullDueBreakdownWithStatus(customer, payments)
+      .filter(
+        (d) => d.isAdjustment || new Date(d.year, d.month - 1, 1) >= cutoff,
+      )
+      .map((d) =>
+        d.isAdjustment
+          ? d
+          : {
+              ...d,
+              realBalance: getMonthBalanceCalc(customer, payments, d.month, d.year),
+              paidThisMonth: getMonthPaidAmount(payments, customer._id, d.month, d.year),
+            },
+      );
+  }, [customer, payments]);
+
+const target = useMemo(() => {
+  const earliest = getEarliestUnresolvedMonth(customer, payments);
+
+  const currentKey = now.getFullYear() * 12 + (now.getMonth() + 1);
+  const earliestKey = earliest.year * 12 + earliest.month;
+  if (earliestKey > currentKey) {
+    return { month: now.getMonth() + 1, year: now.getFullYear() };
+  }
+  return earliest;
+}, [customer, payments]);
+
+const targetLabel = `${months.find((m) => m.number === target.month)?.name} ${target.year}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -466,18 +492,7 @@ function BalanceModal({ customer, payments = [], onClose, onSaved }) {
                 );
               }
 
-              const realBalance = getMonthBalanceCalc(
-                customer,
-                payments,
-                d.month,
-                d.year,
-              );
-              const paidThisMonth = getMonthPaidAmount(
-                payments,
-                customer._id,
-                d.month,
-                d.year,
-              );
+              const { realBalance, paidThisMonth } = d;
 
               return (
                 <div
@@ -572,13 +587,13 @@ function BalanceModal({ customer, payments = [], onClose, onSaved }) {
               />
             </div>
 
-            <input
+            {/* <input
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Reason (optional) — e.g. 'Discount', 'Late fee'"
               className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-            />
+            /> */}
 
             <button
               type="submit"
@@ -608,21 +623,49 @@ function BalanceModal({ customer, payments = [], onClose, onSaved }) {
 // ======================================================
 // PaymentModal ONLY
 // ======================================================
-function PaymentModal({ customer, payments = [], onClose, onSaved }) {
-  const [month, setMonth] = useState(currentMonth);
-  const [year, setYear] = useState(currentYear);
+function PaymentModal({
+  customer,
+  payments = [],
+  payment = null,
+  onClose,
+  onSaved,
+}) {
+  const editing = Boolean(payment);
+  const paidDate = editing ? new Date(payment.paidAt) : null;
+  const savedAllocation = editing ? payment.allocations?.[0] : null;
+
+  const [month, setMonth] = useState(
+    editing
+      ? Number(savedAllocation?.month || paidDate.getMonth() + 1)
+      : currentMonth,
+  );
+  const [year, setYear] = useState(
+    editing
+      ? Number(savedAllocation?.year || paidDate.getFullYear())
+      : currentYear,
+  );
   const now = new Date();
-  const currentBalance = customer
-    ? getMonthBalanceCalc(
-        customer,
-        payments,
-        now.getMonth() + 1,
-        now.getFullYear(),
-      )
-    : 0;
-  const [amount, setAmount] = useState(String(customer.packageAmount || ""));
-  const [addedBy, setAddedBy] = useState("RAJESH");
-  const [note, setNote] = useState("");
+
+ const paymentsForBalance = useMemo(
+  () =>
+    editing
+      ? payments.filter((p) => String(p._id) !== String(payment._id))
+      : payments,
+  [editing, payments, payment],
+);
+
+const currentBalance = useMemo(
+  () =>
+    customer
+      ? getMonthBalanceCalc(customer, paymentsForBalance, now.getMonth() + 1, now.getFullYear())
+      : 0,
+  [customer, paymentsForBalance],
+);
+  const [amount, setAmount] = useState(
+    editing ? String(payment.amount) : String(customer.packageAmount || ""),
+  );
+  const [addedBy, setAddedBy] = useState(editing ? payment.addedBy : "RAJESH");
+  const [note, setNote] = useState(editing ? payment.note || "" : "");
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -636,15 +679,25 @@ function PaymentModal({ customer, payments = [], onClose, onSaved }) {
     try {
       setSaving(true);
 
-      await api.post("/payments", {
-        customer: customer._id,
-        month: Number(month),
-        year: Number(year),
-        amount: Number(amount),
-        addedBy,
-        note,
-        paidAt: new Date().toISOString(),
-      });
+      if (editing) {
+        await api.put(`/payments/${payment._id}`, {
+          month: Number(month),
+          year: Number(year),
+          amount: Number(amount),
+          addedBy,
+          note,
+        });
+      } else {
+        await api.post("/payments", {
+          customer: customer._id,
+          month: Number(month),
+          year: Number(year),
+          amount: Number(amount),
+          addedBy,
+          note,
+          paidAt: new Date().toISOString(),
+        });
+      }
 
       setAmount(String(customer.packageAmount || ""));
       setNote("");
@@ -660,7 +713,7 @@ function PaymentModal({ customer, payments = [], onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         {/* ================= HEADER ================= */}
         <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-4 dark:border-slate-700 dark:bg-slate-800/60">
@@ -677,7 +730,7 @@ function PaymentModal({ customer, payments = [], onClose, onSaved }) {
                   </p>
 
                   <h2 className="text-lg font-bold leading-tight text-slate-900 dark:text-white">
-                    Add Payment
+                    {editing ? "Edit Payment" : "Add Payment"}
                   </h2>
                 </div>
               </div>
@@ -878,7 +931,7 @@ function PaymentModal({ customer, payments = [], onClose, onSaved }) {
               ) : (
                 <>
                   <IndianRupee size={16} />
-                  Save Payment
+                  {editing ? "Update Payment" : "Save Payment"}
                 </>
               )}
             </button>
@@ -1325,7 +1378,7 @@ function buildTimeline(customer, payments) {
   );
 }
 
-function PaymentEntryCard({ payment }) {
+function PaymentEntryCard({ payment, onEdit, onDelete }) {
   const paymentDate = new Date(payment.paidAt);
   const paymentMonth = paymentDate.toLocaleString("en-IN", { month: "long" });
   const paymentYear = paymentDate.getFullYear();
@@ -1383,6 +1436,30 @@ function PaymentEntryCard({ payment }) {
           <p className="mt-1 text-[11px] text-slate-400">
             {paymentDate.toLocaleDateString("en-IN")}
           </p>
+          {(onEdit || onDelete) && (
+            <div className="mt-3 flex justify-end gap-2">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-300"
+                >
+                  <Edit3 size={13} />
+                  Edit
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="flex cursor-pointer items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                >
+                  <Trash2 size={13} />
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1480,7 +1557,7 @@ function FormField({ label, children }) {
   );
 }
 
-function CustomerDetailsModal({ customerId, onClose }) {
+function CustomerDetailsModal({ customerId, onClose, onChanged }) {
   const id = customerId;
   const now = new Date();
 
@@ -1495,7 +1572,7 @@ function CustomerDetailsModal({ customerId, onClose }) {
   const [addedBy, setAddedBy] = useState("RAJESH");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-
+  const [editingPayment, setEditingPayment] = useState(null);
   const loadCustomer = async () => {
     try {
       setLoading(true);
@@ -1553,7 +1630,25 @@ function CustomerDetailsModal({ customerId, onClose }) {
       setSaving(false);
     }
   };
+  const reloadAfterChange = async () => {
+    await Promise.all([loadCustomer(), loadPayments()]);
+    await onChanged?.();
+  };
 
+  const handleDeletePayment = async (p) => {
+    const ok = window.confirm(
+      `Delete this payment of ₹${Number(p.amount).toLocaleString("en-IN")}?\nThe balance will be restored.`,
+    );
+    if (!ok) return;
+
+    try {
+      await api.delete(`/payments/${p._id}`);
+      await reloadAfterChange();
+    } catch (error) {
+      console.error("Delete payment failed:", error);
+      alert(error.response?.data?.message || "Failed to delete payment.");
+    }
+  };
   const totalPaid = useMemo(
     () =>
       payments.reduce(
@@ -1811,6 +1906,13 @@ function CustomerDetailsModal({ customerId, onClose }) {
                   <PaymentEntryCard
                     key={entry.data._id || i}
                     payment={entry.data}
+                    onEdit={() =>
+                      setEditingPayment(
+                        payments.find((p) => p._id === entry.data._id) ||
+                          entry.data,
+                      )
+                    }
+                    onDelete={() => handleDeletePayment(entry.data)}
                   />
                 ) : (
                   <AdjustmentEntryCard key={`adj-${i}`} override={entry.data} />
@@ -1820,6 +1922,18 @@ function CustomerDetailsModal({ customerId, onClose }) {
           )}
         </div>
       </div>
+      {editingPayment && (
+        <PaymentModal
+          customer={customer}
+          payments={payments}
+          payment={editingPayment}
+          onClose={() => setEditingPayment(null)}
+          onSaved={async () => {
+            setEditingPayment(null);
+            await reloadAfterChange();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -3516,8 +3630,15 @@ function CustomerFormModal({ customer, locations, onClose, onSaved }) {
     </div>
   );
 }
-const normKey = (k) => String(k).trim().toLowerCase().replace(/[\s_\-]/g, "");
-const cleanText = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
+const normKey = (k) =>
+  String(k)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_\-]/g, "");
+const cleanText = (v) =>
+  String(v ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const parseAmount = (v) => {
   if (v === null || v === undefined) return null;
@@ -3537,7 +3658,8 @@ const statusOf = (v) =>
 
 // Turns sheet rows into clean rows for the month `prev` (last month)
 function parseImportRows(rawRows, prev) {
-  const tag = `${months[prev.getMonth()].short}${prev.getFullYear()}`.toLowerCase();
+  const tag =
+    `${months[prev.getMonth()].short}${prev.getFullYear()}`.toLowerCase();
 
   return rawRows.map((raw, i) => {
     const flat = {};
@@ -3556,7 +3678,8 @@ function parseImportRows(rawRows, prev) {
     row.name = cleanText(get("name")).toUpperCase();
     row.nuid = cleanText(get("nuid")).toUpperCase();
     row.location = cleanText(get("location"));
-    row.addedBy = cleanText(get("addedby", "collectedby")).toUpperCase() || "RAJESH";
+    row.addedBy =
+      cleanText(get("addedby", "collectedby")).toUpperCase() || "RAJESH";
 
     const pack = parseAmount(get("packageamount", "package"));
     row.packageAmount = pack === null ? 0 : pack;
@@ -3565,8 +3688,11 @@ function parseImportRows(rawRows, prev) {
     const balRaw = flat[`${tag}balance`] ?? flat[`${tag}bal`];
 
     // status from the cells: DC / FREE typed in Paid or Balance
-    const words = [...new Set([statusOf(paidRaw), statusOf(balRaw)].filter(Boolean))];
-    if (words.length > 1) row.errors.push(`Conflicting status: ${words.join(" / ")}`);
+    const words = [
+      ...new Set([statusOf(paidRaw), statusOf(balRaw)].filter(Boolean)),
+    ];
+    if (words.length > 1)
+      row.errors.push(`Conflicting status: ${words.join(" / ")}`);
     row.status = words[0] || "active";
 
     row.paid = statusOf(paidRaw) ? null : parseAmount(paidRaw ?? "");
@@ -3577,7 +3703,10 @@ function parseImportRows(rawRows, prev) {
       row.errors.push("Invalid package amount");
     if (row.paid !== null && (!Number.isFinite(row.paid) || row.paid < 0))
       row.errors.push("Invalid Paid amount");
-    if (row.balance !== null && (!Number.isFinite(row.balance) || row.balance < 0))
+    if (
+      row.balance !== null &&
+      (!Number.isFinite(row.balance) || row.balance < 0)
+    )
       row.errors.push("Invalid Balance amount");
     if (!["RAJESH", "SHIVAM"].includes(row.addedBy))
       row.errors.push(`Invalid addedBy "${row.addedBy}"`);
@@ -3637,13 +3766,33 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
       `${prevLabel} Balance`,
     ];
     const samples = [
-      ["C001", "RAMESH NAIK", "N12345", 500, sampleLocation, "RAJESH", 300, 200],
+      [
+        "C001",
+        "RAMESH NAIK",
+        "N12345",
+        500,
+        sampleLocation,
+        "RAJESH",
+        300,
+        200,
+      ],
       ["C002", "SURESH PAI", "N12346", 500, sampleLocation, "RAJESH", "DC", ""],
-      ["C003", "MEENA SHETTY", "N12347", 500, sampleLocation, "SHIVAM", "FREE", ""],
+      [
+        "C003",
+        "MEENA SHETTY",
+        "N12347",
+        500,
+        sampleLocation,
+        "SHIVAM",
+        "FREE",
+        "",
+      ],
     ];
 
     const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...samples]);
-    dataSheet["!cols"] = headers.map((h) => ({ wch: Math.max(14, h.length + 2) }));
+    dataSheet["!cols"] = headers.map((h) => ({
+      wch: Math.max(14, h.length + 2),
+    }));
 
     const instructions = XLSX.utils.aoa_to_sheet([
       ["Column", "Required", "What to enter"],
@@ -3651,18 +3800,42 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
       ["name", "Yes", "Customer name (saved in capitals)."],
       ["nuid", "No", "NUID."],
       ["packageAmount", "Yes", "Monthly package in rupees."],
-      ["location", "Yes", "Must match a location name exactly (see the Locations sheet)."],
-      ["addedBy", "No", "Who collected the payment: RAJESH (default) or SHIVAM."],
-      [`${prevLabel} Paid`, "No", `Amount paid in ${prevName}, or type DC or FREE.`],
-      [`${prevLabel} Balance`, "No", `Amount still outstanding at the END of ${prevName}.`],
+      [
+        "location",
+        "Yes",
+        "Must match a location name exactly (see the Locations sheet).",
+      ],
+      [
+        "addedBy",
+        "No",
+        "Who collected the payment: RAJESH (default) or SHIVAM.",
+      ],
+      [
+        `${prevLabel} Paid`,
+        "No",
+        `Amount paid in ${prevName}, or type DC or FREE.`,
+      ],
+      [
+        `${prevLabel} Balance`,
+        "No",
+        `Amount still outstanding at the END of ${prevName}.`,
+      ],
       [],
       ["Status is set automatically from the month cells", "", ""],
       ["", "A number", "Customer is ACTIVE."],
       ["", "DC", "Customer is DC (inactive)."],
       ["", "FREE", "Customer is FREE."],
       [],
-      ["", "", `Billing starts from ${prevName}. ${currName}'s balance is calculated automatically.`],
-      ["", "", "Keep the Customers sheet first. Only the first sheet is imported."],
+      [
+        "",
+        "",
+        `Billing starts from ${prevName}. ${currName}'s balance is calculated automatically.`,
+      ],
+      [
+        "",
+        "",
+        "Keep the Customers sheet first. Only the first sheet is imported.",
+      ],
     ]);
     instructions["!cols"] = [{ wch: 44 }, { wch: 22 }, { wch: 90 }];
 
@@ -3688,11 +3861,20 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
 
     setRunning(true);
     setResult(null);
-    const out = { created: 0, skipped: [], errors: [], payments: 0, adjustments: 0, abort: null };
+    const out = {
+      created: 0,
+      skipped: [],
+      errors: [],
+      payments: 0,
+      adjustments: 0,
+      abort: null,
+    };
 
     try {
       const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const rawRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      const rawRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {
+        defval: "",
+      });
       if (!rawRows.length) {
         alert("The uploaded file is empty");
         return;
@@ -3722,7 +3904,11 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
         const locId = locMap.get(row.location.toLowerCase());
         if (!locId) return fail(`Location "${row.location}" not found`);
         if (existing.has(row.code) || seen.has(row.code)) {
-          out.skipped.push({ row: row.rowNumber, code: row.code, reason: "Code already exists" });
+          out.skipped.push({
+            row: row.rowNumber,
+            code: row.code,
+            reason: "Code already exists",
+          });
           return;
         }
         seen.add(row.code);
@@ -3753,7 +3939,8 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
           const list = (await api.get("/customers")).data?.data || [];
           id = list.find((c) => String(c.code).toUpperCase() === row.code)?._id;
         }
-        if (!id) throw new Error("Customer was created but its id could not be read");
+        if (!id)
+          throw new Error("Customer was created but its id could not be read");
 
         try {
           if (row.status !== "active") {
@@ -3795,18 +3982,28 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
       const verify = async (id, row) => {
         const problems = [];
         const c = (await api.get(`/customers/${id}`)).data?.data;
-        if (Number(c?.billingStartMonth) !== pm || Number(c?.billingStartYear) !== py)
-          problems.push(`Billing start was saved as ${c?.billingStartMonth}/${c?.billingStartYear}, expected ${pm}/${py}`);
+        if (
+          Number(c?.billingStartMonth) !== pm ||
+          Number(c?.billingStartYear) !== py
+        )
+          problems.push(
+            `Billing start was saved as ${c?.billingStartMonth}/${c?.billingStartYear}, expected ${pm}/${py}`,
+          );
         if (row.status !== "active" && c?.status !== row.status)
-          problems.push(`Status was saved as "${c?.status}", expected "${row.status}"`);
+          problems.push(
+            `Status was saved as "${c?.status}", expected "${row.status}"`,
+          );
         if (row.adjustment !== 0 && !(c?.balanceOverrides?.length > 0))
           problems.push("The balance adjustment was not saved");
         if (row.paid > 0) {
-          const pays = (await api.get(`/payments/customer/${id}`)).data?.data || [];
+          const pays =
+            (await api.get(`/payments/customer/${id}`)).data?.data || [];
           const d = pays[0] ? new Date(pays[0].paidAt) : null;
           if (!d) problems.push("The payment was not saved");
           else if (d.getMonth() + 1 !== pm || d.getFullYear() !== py)
-            problems.push(`Payment date was saved as ${d.toLocaleDateString("en-IN")}, expected 15/${pm}/${py}`);
+            problems.push(
+              `Payment date was saved as ${d.toLocaleDateString("en-IN")}, expected 15/${pm}/${py}`,
+            );
         }
         return problems;
       };
@@ -3816,7 +4013,10 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
       const tick = () => setProgress({ done: ++done, total: todo.length });
 
       if (todo.length) {
-        const first = Math.max(0, todo.findIndex((r) => r.paid > 0));
+        const first = Math.max(
+          0,
+          todo.findIndex((r) => r.paid > 0),
+        );
         const [canary] = todo.splice(first, 1);
         try {
           const r = await importOne(canary);
@@ -3857,7 +4057,11 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
       await onImported();
     } catch (e) {
       console.error(e);
-      out.errors.push({ row: "-", code: "", message: e.response?.data?.message || e.message });
+      out.errors.push({
+        row: "-",
+        code: "",
+        message: e.response?.data?.message || e.message,
+      });
     } finally {
       setResult(out);
       setRunning(false);
@@ -3901,7 +4105,9 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
             className="block cursor-pointer rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center transition-all hover:border-emerald-400 hover:bg-emerald-50/50 dark:border-slate-700 dark:hover:border-emerald-500 dark:hover:bg-emerald-500/5"
           >
             <FileSpreadsheet size={40} className="mx-auto text-emerald-600" />
-            <p className="mt-3 font-bold text-slate-900 dark:text-white">Select Excel file</p>
+            <p className="mt-3 font-bold text-slate-900 dark:text-white">
+              Select Excel file
+            </p>
             <p className="mt-4 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
               Click anywhere here to choose a file
             </p>
@@ -3924,7 +4130,8 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
           {running && (
             <div className="rounded-xl bg-indigo-50 p-3 text-sm dark:bg-indigo-950">
               <p className="font-bold text-indigo-700 dark:text-indigo-300">
-                Importing {progress.done} / {progress.total} ... please keep this window open
+                Importing {progress.done} / {progress.total} ... please keep
+                this window open
               </p>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-900">
                 <div
@@ -3955,7 +4162,9 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
 
           {result && !result.abort && (
             <div className="rounded-2xl bg-emerald-50 p-4 text-sm dark:bg-emerald-950">
-              <p className="font-bold text-emerald-700 dark:text-emerald-300">Import completed</p>
+              <p className="font-bold text-emerald-700 dark:text-emerald-300">
+                Import completed
+              </p>
               <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                 <div>
                   <p className="text-xs">Imported</p>
@@ -3971,7 +4180,8 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
                 </div>
               </div>
               <p className="mt-2 text-center text-xs text-slate-500">
-                {result.payments} payments and {result.adjustments} balance adjustments created
+                {result.payments} payments and {result.adjustments} balance
+                adjustments created
               </p>
               {result.skipped.length > 0 && (
                 <ul className="mt-3 max-h-24 overflow-y-auto text-xs text-amber-700">
@@ -4046,6 +4256,7 @@ export default function Customers() {
     year: currentYear,
   });
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [selectedLocation, setSelectedLocation] = useState("ALL");
   const [selectedCollector, setSelectedCollector] = useState("ALL");
   const [showLocationSummary, setShowLocationSummary] = useState(false);
@@ -4091,7 +4302,7 @@ export default function Customers() {
     return ids;
   }, [payments, selectedCollector, currentMonthInfo]);
   const filteredCustomers = useMemo(() => {
-    const query = search.trim().toLowerCase();
+      const query = deferredSearch.trim().toLowerCase();
     return customers.filter((customer) => {
       if (customer.active === false) return false;
 
@@ -4826,7 +5037,7 @@ export default function Customers() {
                   onClick={() => setSearch("")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700"
                 >
-                  <X size={16} />
+                  <X size={16} className="text-slate-400" />
                 </button>
               )}
             </div>
@@ -5237,6 +5448,13 @@ export default function Customers() {
           <CustomerDetailsModal
             customerId={viewingCustomerId}
             onClose={() => setViewingCustomerId(null)}
+            onChanged={async () => {
+              await Promise.all([
+                loadCustomers(true),
+                loadPayments(),
+                loadCollection(),
+              ]);
+            }}
           />
         )}
         {showCustomerForm && (

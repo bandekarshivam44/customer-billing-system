@@ -2,6 +2,8 @@ const express = require("express");
 
 const {
   addPayment,
+  updatePayment,
+  deletePayment,
   getCustomerBilling,
   getCustomerPayments,
   getMonthPayments,
@@ -12,6 +14,10 @@ const {
 const router = express.Router();
 
 router.post("/", addPayment);
+
+router.put("/:id", updatePayment);       
+
+router.delete("/:id", deletePayment);    
 
 router.get("/customer/:customerId/billing", getCustomerBilling);
 
