@@ -370,15 +370,15 @@ function BalanceModal({ customer, payments = [], onClose, onSaved }) {
 
   const now = new Date();
 
- const currentBalance = useMemo(() => {
-  if (!customer) return 0;
-  return getMonthBalanceCalc(
-    customer,
-    payments,
-    now.getMonth() + 1,
-    now.getFullYear(),
-  );
-}, [customer, payments]);
+  const currentBalance = useMemo(() => {
+    if (!customer) return 0;
+    return getMonthBalanceCalc(
+      customer,
+      payments,
+      now.getMonth() + 1,
+      now.getFullYear(),
+    );
+  }, [customer, payments]);
 
   const dueBreakdown = useMemo(() => {
     const cutoff = new Date();
@@ -393,24 +393,34 @@ function BalanceModal({ customer, payments = [], onClose, onSaved }) {
           ? d
           : {
               ...d,
-              realBalance: getMonthBalanceCalc(customer, payments, d.month, d.year),
-              paidThisMonth: getMonthPaidAmount(payments, customer._id, d.month, d.year),
+              realBalance: getMonthBalanceCalc(
+                customer,
+                payments,
+                d.month,
+                d.year,
+              ),
+              paidThisMonth: getMonthPaidAmount(
+                payments,
+                customer._id,
+                d.month,
+                d.year,
+              ),
             },
       );
   }, [customer, payments]);
 
-const target = useMemo(() => {
-  const earliest = getEarliestUnresolvedMonth(customer, payments);
+  const target = useMemo(() => {
+    const earliest = getEarliestUnresolvedMonth(customer, payments);
 
-  const currentKey = now.getFullYear() * 12 + (now.getMonth() + 1);
-  const earliestKey = earliest.year * 12 + earliest.month;
-  if (earliestKey > currentKey) {
-    return { month: now.getMonth() + 1, year: now.getFullYear() };
-  }
-  return earliest;
-}, [customer, payments]);
+    const currentKey = now.getFullYear() * 12 + (now.getMonth() + 1);
+    const earliestKey = earliest.year * 12 + earliest.month;
+    if (earliestKey > currentKey) {
+      return { month: now.getMonth() + 1, year: now.getFullYear() };
+    }
+    return earliest;
+  }, [customer, payments]);
 
-const targetLabel = `${months.find((m) => m.number === target.month)?.name} ${target.year}`;
+  const targetLabel = `${months.find((m) => m.number === target.month)?.name} ${target.year}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -443,181 +453,169 @@ const targetLabel = `${months.find((m) => m.number === target.month)?.name} ${ta
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
-              Customer Balance
-            </p>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              {String(customer?.name || "").toUpperCase()}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X size={20} />
-          </button>
+   <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-3">
+  {/* Panel: as tall as content needs, capped to the screen */}
+  <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+    {/* Header (fixed) */}
+    <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+          Customer Balance
+        </p>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+          {String(customer?.name || "").toUpperCase()}
+        </h2>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+      >
+        <X size={20} />
+      </button>
+    </div>
+
+    {/* Form wraps body + footer so the submit button works from the footer */}
+    <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+      {/* Body (the only scrolling part) */}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
+            Current Outstanding Balance
+          </p>
+          <p className="text-xl font-black text-indigo-700 dark:text-indigo-300">
+            ₹{currentBalance.toLocaleString("en-IN")}
+          </p>
         </div>
 
-        <div className="max-h-[65vh] overflow-y-auto p-5">
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
-              Current Outstanding Balance
-            </p>
-            <p className="text-xl font-black text-indigo-700 dark:text-indigo-300">
-              ₹{currentBalance.toLocaleString("en-IN")}
-            </p>
-          </div>
-
-          <div className="mt-4 space-y-1.5">
-            {dueBreakdown.map((d, i) => {
-              if (d.isAdjustment) {
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-950/20"
-                  >
-                    <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                      {d.label}
-                    </span>
-                    <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
-                      {d.amount < 0 ? "−" : ""}₹
-                      {Math.abs(d.amount).toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                );
-              }
-
-              const { realBalance, paidThisMonth } = d;
-
+        <div className="space-y-1.5">
+          {dueBreakdown.map((d, i) => {
+            if (d.isAdjustment) {
               return (
                 <div
                   key={i}
-                  className={`rounded-lg border px-3 py-2 ${
-                    d.cleared
-                      ? "border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-                      : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-                  }`}
+                  className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-950/20"
                 >
-                  <p
-                    className={`mb-1.5 text-xs font-semibold ${d.cleared ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}
-                  >
+                  <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
                     {d.label}
-                  </p>
-
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase text-slate-400">
-                        Due
-                      </p>
-                      <p
-                        className={`text-xs font-bold ${d.cleared ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}
-                      >
-                        ₹{Number(d.amount).toLocaleString("en-IN")}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold uppercase text-slate-400">
-                        Paid
-                      </p>
-                      <p className="text-xs font-bold text-emerald-600">
-                        ₹{paidThisMonth.toLocaleString("en-IN")}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold uppercase text-slate-400">
-                        Balance
-                      </p>
-                      <p
-                        className={`text-xs font-bold ${realBalance > 0 ? "text-red-600" : "text-emerald-600"}`}
-                      >
-                        ₹{realBalance.toLocaleString("en-IN")}
-                      </p>
-                    </div>
-                  </div>
+                  </span>
+                  <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                    {d.amount < 0 ? "−" : ""}₹
+                    {Math.abs(d.amount).toLocaleString("en-IN")}
+                  </span>
                 </div>
               );
-            })}
+            }
+
+            const { realBalance, paidThisMonth } = d;
+
+            return (
+              <div
+                key={i}
+                className={`rounded-lg border px-3 py-2 ${
+                  d.cleared
+                    ? "border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                    : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+                }`}
+              >
+                <p
+                  className={`mb-1.5 text-xs font-semibold ${d.cleared ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}
+                >
+                  {d.label}
+                </p>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Due</p>
+                    <p
+                      className={`text-xs font-bold ${d.cleared ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}
+                    >
+                      ₹{Number(d.amount).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Paid</p>
+                    <p className="text-xs font-bold text-emerald-600">
+                      ₹{paidThisMonth.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Balance</p>
+                    <p
+                      className={`text-xs font-bold ${realBalance > 0 ? "text-red-600" : "text-emerald-600"}`}
+                    >
+                      ₹{realBalance.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Adjust section: no max-h, no overflow here anymore */}
+        <div className="space-y-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            Adjust balance — will apply to{" "}
+            <span className="text-indigo-600 dark:text-indigo-400">{targetLabel}</span>
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setAdjType("deduct")}
+              className={`rounded-xl border px-4 py-3 text-sm font-bold ${adjType === "deduct" ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30" : "border-slate-200 text-slate-600 dark:border-slate-700"}`}
+            >
+              − Deduct
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdjType("add")}
+              className={`rounded-xl border px-4 py-3 text-sm font-bold ${adjType === "add" ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/30" : "border-slate-200 text-slate-600 dark:border-slate-700"}`}
+            >
+              + Add
+            </button>
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="mt-5 space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700"
-          >
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-              Adjust balance — will apply to{" "}
-              <span className="text-indigo-600 dark:text-indigo-400">
-                {targetLabel}
-              </span>
-            </p>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setAdjType("deduct")}
-                className={`rounded-xl border px-4 py-3 text-sm font-bold ${adjType === "deduct" ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30" : "border-slate-200 text-slate-600 dark:border-slate-700"}`}
-              >
-                − Deduct
-              </button>
-              <button
-                type="button"
-                onClick={() => setAdjType("add")}
-                className={`rounded-xl border px-4 py-3 text-sm font-bold ${adjType === "add" ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/30" : "border-slate-200 text-slate-600 dark:border-slate-700"}`}
-              >
-                + Add
-              </button>
-            </div>
-
-            <div className="relative">
-              <IndianRupee
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="number"
-                min="1"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Amount"
-                className="w-full rounded-xl border border-slate-300 py-3 pl-9 pr-4 text-sm font-bold dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-              />
-            </div>
-
-            {/* <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Reason (optional) — e.g. 'Discount', 'Late fee'"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-            /> */}
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {saving
-                ? "Saving..."
-                : `${adjType === "deduct" ? "Deduct" : "Add"} ₹${amount || 0} on ${targetLabel}`}
-            </button>
-          </form>
-        </div>
-
-        <div className="flex gap-3 border-t border-slate-200 p-4 dark:border-slate-700">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300"
-          >
-            CLOSE
-          </button>
+          <div className="relative">
+            <IndianRupee
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="number"
+              min="1"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Amount"
+              className="w-full rounded-xl border border-slate-300 py-3 pl-9 pr-4 text-sm font-bold dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Footer (fixed, always visible) */}
+      <div className="flex shrink-0 gap-3 border-t border-slate-200 p-4 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="flex-[1.5] rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {saving
+            ? "Saving..."
+            : `${adjType === "deduct" ? "Deduct" : "Add"} ₹${amount || 0} on ${targetLabel}`}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
   );
 }
 // ======================================================
@@ -646,21 +644,26 @@ function PaymentModal({
   );
   const now = new Date();
 
- const paymentsForBalance = useMemo(
-  () =>
-    editing
-      ? payments.filter((p) => String(p._id) !== String(payment._id))
-      : payments,
-  [editing, payments, payment],
-);
+  const paymentsForBalance = useMemo(
+    () =>
+      editing
+        ? payments.filter((p) => String(p._id) !== String(payment._id))
+        : payments,
+    [editing, payments, payment],
+  );
 
-const currentBalance = useMemo(
-  () =>
-    customer
-      ? getMonthBalanceCalc(customer, paymentsForBalance, now.getMonth() + 1, now.getFullYear())
-      : 0,
-  [customer, paymentsForBalance],
-);
+  const currentBalance = useMemo(
+    () =>
+      customer
+        ? getMonthBalanceCalc(
+            customer,
+            paymentsForBalance,
+            now.getMonth() + 1,
+            now.getFullYear(),
+          )
+        : 0,
+    [customer, paymentsForBalance],
+  );
   const [amount, setAmount] = useState(
     editing ? String(payment.amount) : String(customer.packageAmount || ""),
   );
@@ -844,7 +847,7 @@ const currentBalance = useMemo(
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Enter payment amount"
-                autoFocus
+                // autoFocus
                 className="w-full rounded-xl border border-slate-200 bg-white py-3.5 pl-11 pr-4 text-base font-semibold text-slate-800 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:ring-indigo-950"
               />
             </div>
@@ -924,13 +927,13 @@ const currentBalance = useMemo(
             <button
               type="submit"
               disabled={saving}
-              className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex flex-[1.5] cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? (
                 "Saving..."
               ) : (
                 <>
-                  <IndianRupee size={16} />
+                  <IndianRupee size={16} className="shrink-0" />
                   {editing ? "Update Payment" : "Save Payment"}
                 </>
               )}
@@ -1324,8 +1327,6 @@ function computePaymentAllocations(customer, payments) {
       if (bucket.remaining > 0) break;
     }
 
-    // Payment still has leftover after clearing everything known so far —
-    // push forward into a brand-new future month, same as before
     if (amount > 0) {
       const last = buckets[buckets.length - 1];
       let m = last ? last.month : now.getMonth() + 1;
@@ -1384,14 +1385,16 @@ function PaymentEntryCard({ payment, onEdit, onDelete }) {
   const paymentYear = paymentDate.getFullYear();
 
   return (
-    <div className="border-l-4 border-emerald-500 p-5 pl-4 transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
-      <div className="flex items-start justify-between gap-4">
+    <div className="border-l-4 border-emerald-500 p-4 pl-4 transition hover:bg-slate-50 dark:hover:bg-slate-800/40 sm:p-5 sm:pl-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        {/* Left Content */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="font-bold text-slate-900 dark:text-white">
+            <p className="truncate font-bold text-slate-900 dark:text-white">
               {paymentMonth}
             </p>
-            <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+
+            <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               {paymentYear}
             </span>
           </div>
@@ -1406,7 +1409,7 @@ function PaymentEntryCard({ payment, onEdit, onDelete }) {
           {payment.note && (
             <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-400">
               <FileText size={13} className="mt-0.5 shrink-0" />
-              {payment.note}
+              <span className="min-w-0 break-words">{payment.note}</span>
             </p>
           )}
 
@@ -1415,12 +1418,15 @@ function PaymentEntryCard({ payment, onEdit, onDelete }) {
               {payment.allocations.map((a, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between text-xs"
+                  className="flex items-center justify-between gap-3 text-xs"
                 >
-                  <span className="text-slate-500 dark:text-slate-400">
+                  {/* Allocation label */}
+                  <span className="min-w-0 flex-1 whitespace-nowrap text-slate-500 dark:text-slate-400">
                     Applied to {a.label}
                   </span>
-                  <span className="font-bold text-slate-700 dark:text-slate-200">
+
+                  {/* Allocation amount */}
+                  <span className="shrink-0 whitespace-nowrap font-bold text-slate-700 dark:text-slate-200">
                     ₹{Number(a.amount).toLocaleString("en-IN")}
                   </span>
                 </div>
@@ -1429,32 +1435,40 @@ function PaymentEntryCard({ payment, onEdit, onDelete }) {
           )}
         </div>
 
-        <div className="shrink-0 text-right">
-          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-            +₹{Number(payment.amount).toLocaleString("en-IN")}
-          </p>
-          <p className="mt-1 text-[11px] text-slate-400">
-            {paymentDate.toLocaleDateString("en-IN")}
-          </p>
+        {/* Right Content */}
+        <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end sm:text-right">
+          {/* Payment Amount + Date */}
+          <div className="text-left sm:text-right">
+            <p className="whitespace-nowrap text-lg font-bold text-emerald-600 dark:text-emerald-400">
+              +₹{Number(payment.amount).toLocaleString("en-IN")}
+            </p>
+
+            <p className="mt-1 whitespace-nowrap text-[11px] text-slate-400">
+              {paymentDate.toLocaleDateString("en-IN")}
+            </p>
+          </div>
+
+          {/* Action Buttons */}
           {(onEdit || onDelete) && (
-            <div className="mt-3 flex justify-end gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {onEdit && (
                 <button
                   type="button"
                   onClick={onEdit}
-                  className="flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-300"
+                  className="flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-4 text-xs font-bold whitespace-nowrap text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-300"
                 >
-                  <Edit3 size={13} />
+                  <Edit3 size={14} className="shrink-0" />
                   Edit
                 </button>
               )}
+
               {onDelete && (
                 <button
                   type="button"
                   onClick={onDelete}
-                  className="flex cursor-pointer items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                  className="flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-bold whitespace-nowrap text-red-600 transition hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-300 hover:text-red-600"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={14} className="shrink-0" />
                   Delete
                 </button>
               )}
@@ -1857,25 +1871,28 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
         </div>
 
         <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between border-b border-slate-100 p-5 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
                 <CalendarDays size={19} />
               </div>
-              <div>
+
+              <div className="min-w-0">
                 <h2 className="font-bold text-slate-900 dark:text-white">
                   Payment History
                 </h2>
+
                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   Payments and balance adjustments
                 </p>
               </div>
             </div>
-            {timeline.length > 0 && (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                {timeline.length} {timeline.length === 1 ? "entry" : "entries"}
-              </span>
-            )}
+
+            {/* {timeline.length > 0 && (
+    <span className="w-fit shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+      {timeline.length} {timeline.length === 1 ? "entry" : "entries"}
+    </span>
+  )} */}
           </div>
 
           {paymentsLoading ? (
@@ -3278,7 +3295,13 @@ function CustomerFormModal({ customer, locations, onClose, onSaved }) {
 
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
+const inputCls =
+  "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white";
   const [form, setForm] = useState({
     code: customer?.code || "",
     name: customer?.name || "",
@@ -3288,9 +3311,6 @@ function CustomerFormModal({ customer, locations, onClose, onSaved }) {
       customer?.packageAmount !== undefined
         ? String(customer.packageAmount)
         : "",
-
-    // Edit = existing value
-    // Add = current month/year
     billingStartMonth: customer?.billingStartMonth
       ? String(customer.billingStartMonth)
       : String(currentMonth),
@@ -3359,275 +3379,216 @@ function CustomerFormModal({ customer, locations, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        {/* HEADER */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+  <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-3">
+  {/* PANEL */}
+  <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+    {/* HEADER (fixed) */}
+    <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+          Customer
+        </p>
+        <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-white">
+          {editing ? "Edit Customer" : "Add Customer"}
+        </h2>
+      </div>
+
+      <button
+        type="button"
+        onClick={onClose}
+        className="cursor-pointer rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+      >
+        <X size={20} />
+      </button>
+    </div>
+
+    {/* FORM wraps body + footer */}
+    <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+      {/* BODY (only scrolling part) */}
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
+        {/* CODE + NUID */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
-              Customer
-            </p>
-
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              {editing ? "Edit Customer" : "Add Customer"}
-            </h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* FORM */}
-        <form onSubmit={handleSubmit} className="space-y-4 p-5">
-          {/* CODE + NUID */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-semibold">Code</label>
-
-              <input
-                value={form.code}
-                onChange={(e) =>
-                  updateField("code", e.target.value.toUpperCase())
-                }
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                placeholder="C001"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-semibold">NUID</label>
-
-              <input
-                value={form.nuid}
-                onChange={(e) =>
-                  updateField("nuid", e.target.value.toUpperCase())
-                }
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
-            </div>
-          </div>
-
-          {/* NAME */}
-          <div>
-            <label className="mb-1 block text-sm font-semibold">Name</label>
-
+            <label className="mb-1 block text-sm font-semibold">Code</label>
             <input
-              value={form.name}
-              onChange={(e) =>
-                updateField("name", e.target.value.toUpperCase())
-              }
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              value={form.code}
+              onChange={(e) => updateField("code", e.target.value.toUpperCase())}
+              className={inputCls}
+              placeholder="C001"
             />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold">NUID</label>
+            <input
+              value={form.nuid}
+              onChange={(e) => updateField("nuid", e.target.value.toUpperCase())}
+              className={inputCls}
+            />
+          </div>
+        </div>
 
-          {/* MOBILE + PACKAGE */}
+        {/* NAME */}
+        <div>
+          <label className="mb-1 block text-sm font-semibold">Name</label>
+          <input
+            value={form.name}
+            onChange={(e) => updateField("name", e.target.value.toUpperCase())}
+            className={inputCls}
+          />
+        </div>
+
+        {/* MOBILE + PACKAGE */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-semibold">Mobile</label>
+            <input
+              value={form.mobile}
+              onChange={(e) => updateField("mobile", e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold">Package</label>
+            <input
+              type="number"
+              min="0"
+              value={form.packageAmount}
+              onChange={(e) => updateField("packageAmount", e.target.value)}
+              placeholder="₹500"
+              className={inputCls}
+            />
+          </div>
+        </div>
+
+        {/* BILLING START */}
+        <div>
+          <label className="mb-1 block text-sm font-semibold">Billing Start</label>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-semibold">Mobile</label>
-
-              <input
-                value={form.mobile}
-                onChange={(e) => updateField("mobile", e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-semibold">
-                Package
-              </label>
-
-              <input
-                type="number"
-                min="0"
-                value={form.packageAmount}
-                onChange={(e) => updateField("packageAmount", e.target.value)}
-                placeholder="₹500"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
-            </div>
-          </div>
-
-          {/* BILLING START */}
-          <div>
-            <label className="mb-1 block text-sm font-semibold">
-              Billing Start
-            </label>
-
-            <div className="grid grid-cols-2 gap-3">
-              {/* MONTH */}
-              <select
-                value={form.billingStartMonth}
-                onChange={(e) =>
-                  updateField("billingStartMonth", e.target.value)
-                }
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              >
-                <option value="">Select Month</option>
-
-                {[
-                  "January",
-                  "February",
-                  "March",
-                  "April",
-                  "May",
-                  "June",
-                  "July",
-                  "August",
-                  "September",
-                  "October",
-                  "November",
-                  "December",
-                ].map((month, index) => (
-                  <option key={index + 1} value={index + 1}>
-                    {month}
-                  </option>
-                ))}
-              </select>
-
-              {/* YEAR */}
-              <select
-                value={form.billingStartYear}
-                onChange={(e) =>
-                  updateField("billingStartYear", e.target.value)
-                }
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              >
-                <option value="">Select Year</option>
-
-                {Array.from(
-                  { length: 6 },
-                  (_, index) => currentYear - index,
-                ).map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {/* STATUS */}
-          <div>
-            <label className="mb-1 block text-sm font-semibold">Status</label>
-
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { value: "active", label: "Active" },
-                { value: "inactive", label: "DC" },
-                { value: "free", label: "Free" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => updateField("status", opt.value)}
-                  className={`rounded-xl border px-3 py-3 text-sm font-bold transition ${
-                    form.status === opt.value
-                      ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-400"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 hover:text-slate-700"
-                  }`}
-                >
-                  {opt.label}
-                </button>
+            <select
+              value={form.billingStartMonth}
+              onChange={(e) => updateField("billingStartMonth", e.target.value)}
+              className={inputCls}
+            >
+              <option value="">Select Month</option>
+              {MONTHS.map((month, index) => (
+                <option key={index + 1} value={index + 1}>
+                  {month}
+                </option>
               ))}
-            </div>
-
-            {editing && (
-              <div className="mt-3">
-                <label className="mb-1 block text-xs font-semibold text-slate-500">
-                  Apply this status starting from
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <select
-                    value={form.statusMonth}
-                    onChange={(e) => updateField("statusMonth", e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  >
-                    {[
-                      "January",
-                      "February",
-                      "March",
-                      "April",
-                      "May",
-                      "June",
-                      "July",
-                      "August",
-                      "September",
-                      "October",
-                      "November",
-                      "December",
-                    ].map((m, i) => (
-                      <option key={i + 1} value={i + 1}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={form.statusYear}
-                    onChange={(e) => updateField("statusYear", e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  >
-                    {Array.from({ length: 6 }, (_, i) => currentYear - i).map(
-                      (y) => (
-                        <option key={y} value={y}>
-                          {y}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
-          {/* LOCATION */}
-          <div>
-            <label className="mb-1 block text-sm font-semibold">Location</label>
+            </select>
 
             <select
-              value={form.location}
-              onChange={(e) => updateField("location", e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              value={form.billingStartYear}
+              onChange={(e) => updateField("billingStartYear", e.target.value)}
+              className={inputCls}
             >
-              <option value="">Select Location</option>
-
-              {locations.map((location) => (
-                <option key={location._id} value={location._id}>
-                  {location.name}
+              <option value="">Select Year</option>
+              {Array.from({ length: 6 }, (_, i) => currentYear - i).map((year) => (
+                <option key={year} value={year}>
+                  {year}
                 </option>
               ))}
             </select>
           </div>
-          {/* BUTTONS */}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold dark:border-slate-700"
-            >
-              Cancel
-            </button>
+        </div>
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              <Save size={17} />
-
-              {saving
-                ? "Saving..."
-                : editing
-                  ? "Update Customer"
-                  : "Add Customer"}
-            </button>
+        {/* STATUS */}
+        <div>
+          <label className="mb-1 block text-sm font-semibold">Status</label>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "DC" },
+              { value: "free", label: "Free" },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => updateField("status", opt.value)}
+                className={`rounded-xl border px-3 py-3 text-sm font-bold transition ${
+                  form.status === opt.value
+                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-400"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
-        </form>
+
+          {editing && (
+            <div className="mt-3">
+              <label className="mb-1 block text-xs font-semibold text-slate-500">
+                Apply this status starting from
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={form.statusMonth}
+                  onChange={(e) => updateField("statusMonth", e.target.value)}
+                  className={inputCls}
+                >
+                  {MONTHS.map((m, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={form.statusYear}
+                  onChange={(e) => updateField("statusYear", e.target.value)}
+                  className={inputCls}
+                >
+                  {Array.from({ length: 6 }, (_, i) => currentYear - i).map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* LOCATION */}
+        <div>
+          <label className="mb-1 block text-sm font-semibold">Location</label>
+          <select
+            value={form.location}
+            onChange={(e) => updateField("location", e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Select Location</option>
+            {locations.map((location) => (
+              <option key={location._id} value={location._id}>
+                {location.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-    </div>
+
+      {/* FOOTER BUTTONS (fixed, always visible) */}
+      <div className="flex shrink-0 gap-3 border-t border-slate-200 p-4 dark:border-slate-700 sm:px-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 cursor-pointer rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="flex flex-[1.5] cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Save size={17} className="shrink-0" />
+          {saving ? "Saving..." : editing ? "Update Customer" : "Add Customer"}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
   );
 }
 const normKey = (k) =>
@@ -4302,7 +4263,7 @@ export default function Customers() {
     return ids;
   }, [payments, selectedCollector, currentMonthInfo]);
   const filteredCustomers = useMemo(() => {
-      const query = deferredSearch.trim().toLowerCase();
+    const query = deferredSearch.trim().toLowerCase();
     return customers.filter((customer) => {
       if (customer.active === false) return false;
 
