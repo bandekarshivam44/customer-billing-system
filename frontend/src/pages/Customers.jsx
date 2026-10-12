@@ -3179,8 +3179,7 @@ function StatCard({
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
             {title}
-          </p>
-
+          </p>            
           {/* Show status counts ONLY for Customer Status card */}
           {title === "Customer Status" ? (
             <div className="mt-3 flex flex-col items-right gap-x-3 gap-y-1 text-sm">
@@ -4974,7 +4973,6 @@ export default function Customers() {
                 Customers
               </h1>
             </div>
-            <SyncStatus />
             {/* <TestClockWidget /> */}
             {/* Actions */}
             <div className="flex items-center gap-1">
@@ -5049,12 +5047,17 @@ export default function Customers() {
 
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
-            icon={Users}
-            title="Total Customers"
-            value={customers.length}
-            subtitle="All registered customers"
-            iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
-          />
+  icon={Users}
+  title="Total Customers"
+  value={customers.length}
+  subtitle={
+    <div className="space-y-2">
+      <p>All registered customers</p>
+      <SyncStatus />
+    </div>
+  }
+  iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
+/>
           <StatCard
             icon={UserCheck}
             title="Customer Status"
