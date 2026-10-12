@@ -11,6 +11,7 @@ const connectDB = require("./config/db");
 const locationRoutes = require("./routes/locationRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const syncRoutes = require("./routes/syncRoutes");
 
 dotenv.config();
 
@@ -22,7 +23,7 @@ app.use(express.json());
 app.use("/api/locations", locationRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/payments", paymentRoutes);
-
+app.use("/api/sync", syncRoutes);
 app.get("/", (req, res) => {
   res.json({
     success: true,

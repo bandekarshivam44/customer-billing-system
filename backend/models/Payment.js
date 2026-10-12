@@ -24,17 +24,26 @@ const paymentAllocationSchema = new mongoose.Schema(
     _id: false,
   },
 );
-
 const paymentSchema = new mongoose.Schema(
   {
+    clientId: {
+      type: String,
+      unique: true,
+      sparse: true,   
+    },
+
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
       required: true,
       index: true,
     },
-
-    // Actual amount received
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      required: true,
+      index: true,
+    },
     amount: {
       type: Number,
       required: true,
@@ -47,7 +56,6 @@ const paymentSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Actual collection date
     paidAt: {
       type: Date,
       default: Date.now,
@@ -73,6 +81,7 @@ const paymentSchema = new mongoose.Schema(
 paymentSchema.index({
   customer: 1,
   paidAt: -1,
+  updatedAt: 1,
 });
 
 module.exports = mongoose.model("Payment", paymentSchema);

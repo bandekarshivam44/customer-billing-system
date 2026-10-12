@@ -36,6 +36,13 @@ import {
 import { setFakeNow, isFakeNowActive, clearFakeNow } from "../utils/testClock";
 import api from "../services/api";
 import { useTheme } from "../context/ThemeContext";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "../db";
+import { syncNow, startAutoSync } from "../sync";
+import { submitPayment, deleteLocalPayment } from "../offlineActions";
+import SyncStatus from "../components/SyncStatus";
+
+const EMPTY = [];
 // ======================================================
 // MONTHS
 // ======================================================
@@ -453,169 +460,177 @@ function BalanceModal({ customer, payments = [], onClose, onSaved }) {
   };
 
   return (
-   <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-3">
-  {/* Panel: as tall as content needs, capped to the screen */}
-  <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
-    {/* Header (fixed) */}
-    <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
-          Customer Balance
-        </p>
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-          {String(customer?.name || "").toUpperCase()}
-        </h2>
-      </div>
-      <button
-        type="button"
-        onClick={onClose}
-        className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-      >
-        <X size={20} />
-      </button>
-    </div>
-
-    {/* Form wraps body + footer so the submit button works from the footer */}
-    <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-      {/* Body (the only scrolling part) */}
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
-            Current Outstanding Balance
-          </p>
-          <p className="text-xl font-black text-indigo-700 dark:text-indigo-300">
-            ₹{currentBalance.toLocaleString("en-IN")}
-          </p>
+    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-3">
+      {/* Panel: as tall as content needs, capped to the screen */}
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+        {/* Header (fixed) */}
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+              Customer Balance
+            </p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              {String(customer?.name || "").toUpperCase()}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <div className="space-y-1.5">
-          {dueBreakdown.map((d, i) => {
-            if (d.isAdjustment) {
-              return (
-                <div
-                  key={i}
-                  className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-950/20"
-                >
-                  <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                    {d.label}
-                  </span>
-                  <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
-                    {d.amount < 0 ? "−" : ""}₹
-                    {Math.abs(d.amount).toLocaleString("en-IN")}
-                  </span>
-                </div>
-              );
-            }
+        {/* Form wraps body + footer so the submit button works from the footer */}
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          {/* Body (the only scrolling part) */}
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+              <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                Current Outstanding Balance
+              </p>
+              <p className="text-xl font-black text-indigo-700 dark:text-indigo-300">
+                ₹{currentBalance.toLocaleString("en-IN")}
+              </p>
+            </div>
 
-            const { realBalance, paidThisMonth } = d;
-
-            return (
-              <div
-                key={i}
-                className={`rounded-lg border px-3 py-2 ${
-                  d.cleared
-                    ? "border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-                    : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-                }`}
-              >
-                <p
-                  className={`mb-1.5 text-xs font-semibold ${d.cleared ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}
-                >
-                  {d.label}
-                </p>
-
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Due</p>
-                    <p
-                      className={`text-xs font-bold ${d.cleared ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}
+            <div className="space-y-1.5">
+              {dueBreakdown.map((d, i) => {
+                if (d.isAdjustment) {
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-950/20"
                     >
-                      ₹{Number(d.amount).toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Paid</p>
-                    <p className="text-xs font-bold text-emerald-600">
-                      ₹{paidThisMonth.toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Balance</p>
+                      <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                        {d.label}
+                      </span>
+                      <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                        {d.amount < 0 ? "−" : ""}₹
+                        {Math.abs(d.amount).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  );
+                }
+
+                const { realBalance, paidThisMonth } = d;
+
+                return (
+                  <div
+                    key={i}
+                    className={`rounded-lg border px-3 py-2 ${
+                      d.cleared
+                        ? "border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                        : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+                    }`}
+                  >
                     <p
-                      className={`text-xs font-bold ${realBalance > 0 ? "text-red-600" : "text-emerald-600"}`}
+                      className={`mb-1.5 text-xs font-semibold ${d.cleared ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}
                     >
-                      ₹{realBalance.toLocaleString("en-IN")}
+                      {d.label}
                     </p>
+
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">
+                          Due
+                        </p>
+                        <p
+                          className={`text-xs font-bold ${d.cleared ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}
+                        >
+                          ₹{Number(d.amount).toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">
+                          Paid
+                        </p>
+                        <p className="text-xs font-bold text-emerald-600">
+                          ₹{paidThisMonth.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">
+                          Balance
+                        </p>
+                        <p
+                          className={`text-xs font-bold ${realBalance > 0 ? "text-red-600" : "text-emerald-600"}`}
+                        >
+                          ₹{realBalance.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                );
+              })}
+            </div>
+
+            {/* Adjust section: no max-h, no overflow here anymore */}
+            <div className="space-y-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Adjust balance — will apply to{" "}
+                <span className="text-indigo-600 dark:text-indigo-400">
+                  {targetLabel}
+                </span>
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAdjType("deduct")}
+                  className={`rounded-xl border px-4 py-3 text-sm font-bold ${adjType === "deduct" ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30" : "border-slate-200 text-slate-600 dark:border-slate-700"}`}
+                >
+                  − Deduct
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdjType("add")}
+                  className={`rounded-xl border px-4 py-3 text-sm font-bold ${adjType === "add" ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/30" : "border-slate-200 text-slate-600 dark:border-slate-700"}`}
+                >
+                  + Add
+                </button>
               </div>
-            );
-          })}
-        </div>
 
-        {/* Adjust section: no max-h, no overflow here anymore */}
-        <div className="space-y-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-            Adjust balance — will apply to{" "}
-            <span className="text-indigo-600 dark:text-indigo-400">{targetLabel}</span>
-          </p>
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setAdjType("deduct")}
-              className={`rounded-xl border px-4 py-3 text-sm font-bold ${adjType === "deduct" ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30" : "border-slate-200 text-slate-600 dark:border-slate-700"}`}
-            >
-              − Deduct
-            </button>
-            <button
-              type="button"
-              onClick={() => setAdjType("add")}
-              className={`rounded-xl border px-4 py-3 text-sm font-bold ${adjType === "add" ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/30" : "border-slate-200 text-slate-600 dark:border-slate-700"}`}
-            >
-              + Add
-            </button>
+              <div className="relative">
+                <IndianRupee
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Amount"
+                  className="w-full rounded-xl border border-slate-300 py-3 pl-9 pr-4 text-sm font-bold dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="relative">
-            <IndianRupee
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="number"
-              min="1"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Amount"
-              className="w-full rounded-xl border border-slate-300 py-3 pl-9 pr-4 text-sm font-bold dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-            />
+          {/* Footer (fixed, always visible) */}
+          <div className="flex shrink-0 gap-3 border-t border-slate-200 p-4 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-[1.5] rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {saving
+                ? "Saving..."
+                : `${adjType === "deduct" ? "Deduct" : "Add"} ₹${amount || 0} on ${targetLabel}`}
+            </button>
           </div>
-        </div>
+        </form>
       </div>
-
-      {/* Footer (fixed, always visible) */}
-      <div className="flex shrink-0 gap-3 border-t border-slate-200 p-4 dark:border-slate-700">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="flex-[1.5] rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {saving
-            ? "Saving..."
-            : `${adjType === "deduct" ? "Deduct" : "Add"} ₹${amount || 0} on ${targetLabel}`}
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
+    </div>
   );
 }
 // ======================================================
@@ -681,8 +696,13 @@ function PaymentModal({
 
     try {
       setSaving(true);
-
       if (editing) {
+        if (!navigator.onLine) {
+          alert(
+            "Editing a payment needs internet. Please try again when online.",
+          );
+          return;
+        }
         await api.put(`/payments/${payment._id}`, {
           month: Number(month),
           year: Number(year),
@@ -691,14 +711,13 @@ function PaymentModal({
           note,
         });
       } else {
-        await api.post("/payments", {
+        await submitPayment({
           customer: customer._id,
-          month: Number(month),
-          year: Number(year),
-          amount: Number(amount),
+          month,
+          year,
+          amount,
           addedBy,
           note,
-          paidAt: new Date().toISOString(),
         });
       }
 
@@ -1397,6 +1416,16 @@ function PaymentEntryCard({ payment, onEdit, onDelete }) {
             <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               {paymentYear}
             </span>
+            {payment.synced === 0 && (
+              <span className="shrink-0 rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">
+                ⏳ Pending sync
+              </span>
+            )}
+            {payment.synced === -1 && (
+              <span className="shrink-0 rounded-md bg-red-100 px-2 py-1 text-[10px] font-bold text-red-700">
+                ❌ Rejected: {payment.syncError}
+              </span>
+            )}
           </div>
 
           <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -1577,7 +1606,8 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
 
   const [customer, setCustomer] = useState(null);
   const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
+    const [initialSync, setInitialSync] = useState(() => !localStorage.getItem("lastSync"));
+    const [loading, setLoading] = useState(true);
   const [paymentsLoading, setPaymentsLoading] = useState(true);
   const [showPayment, setShowPayment] = useState(false);
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -1590,8 +1620,8 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
   const loadCustomer = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/customers/${id}`);
-      setCustomer(response.data.data);
+      const c = await db.customers.get(id);
+      setCustomer(c || null);
     } catch (error) {
       console.error("Failed to load customer:", error);
     } finally {
@@ -1602,8 +1632,9 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
   const loadPayments = async () => {
     try {
       setPaymentsLoading(true);
-      const response = await api.get(`/payments/customer/${id}`);
-      setPayments(response.data.data || []);
+      const list = await db.payments.where("customer").equals(id).toArray();
+      list.sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt));
+      setPayments(list);
     } catch (error) {
       console.error("Failed to load payments:", error);
     } finally {
@@ -1645,6 +1676,7 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
     }
   };
   const reloadAfterChange = async () => {
+    await syncNow(); // bring local data up to date after an online edit/delete
     await Promise.all([loadCustomer(), loadPayments()]);
     await onChanged?.();
   };
@@ -1656,7 +1688,16 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
     if (!ok) return;
 
     try {
-      await api.delete(`/payments/${p._id}`);
+      if (p.synced === 0 || p.synced === -1) {
+        // never reached the server, so just remove it from this device
+        await deleteLocalPayment(p.clientId);
+      } else {
+        if (!navigator.onLine) {
+          alert("Deleting a saved payment needs internet.");
+          return;
+        }
+        await api.delete(`/payments/${p._id}`);
+      }
       await reloadAfterChange();
     } catch (error) {
       console.error("Delete payment failed:", error);
@@ -1923,11 +1964,14 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
                   <PaymentEntryCard
                     key={entry.data._id || i}
                     payment={entry.data}
-                    onEdit={() =>
-                      setEditingPayment(
-                        payments.find((p) => p._id === entry.data._id) ||
-                          entry.data,
-                      )
+                    onEdit={
+                      entry.data.synced === 0 || entry.data.synced === -1
+                        ? undefined
+                        : () =>
+                            setEditingPayment(
+                              payments.find((p) => p._id === entry.data._id) ||
+                                entry.data,
+                            )
                     }
                     onDelete={() => handleDeletePayment(entry.data)}
                   />
@@ -2830,10 +2874,38 @@ function CustomerTableRow({
       ? payments
       : payments.filter((p) => p.addedBy === selectedCollector);
 
-  const oldMonthPaid = oldEntry?.paid ?? 0;
-  const oldMonthBalance = oldEntry?.balance ?? 0;
-  const previousPaid = previousEntry?.paid ?? 0;
-  const previousBalance = previousEntry?.balance ?? 0;
+  const oldMonthPaid =
+    oldEntry?.paid ??
+    getMonthPaidAmount(
+      payments,
+      customer._id,
+      monthBeforePrevious.number,
+      monthBeforePrevious.year,
+    );
+  const oldMonthBalance =
+    oldEntry?.balance ??
+    getMonthBalanceCalc(
+      customer,
+      payments,
+      monthBeforePrevious.number,
+      monthBeforePrevious.year,
+    );
+  const previousPaid =
+    previousEntry?.paid ??
+    getMonthPaidAmount(
+      payments,
+      customer._id,
+      previousMonth.number,
+      previousMonth.year,
+    );
+  const previousBalance =
+    previousEntry?.balance ??
+    getMonthBalanceCalc(
+      customer,
+      payments,
+      previousMonth.number,
+      previousMonth.year,
+    );
 
   const currentPaid = getMonthPaidAmount(
     scopedPayments,
@@ -3295,13 +3367,23 @@ function CustomerFormModal({ customer, locations, onClose, onSaved }) {
 
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+  const MONTHS = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
 
-const inputCls =
-  "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white";
+  const inputCls =
+    "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white";
   const [form, setForm] = useState({
     code: customer?.code || "",
     name: customer?.name || "",
@@ -3379,216 +3461,246 @@ const inputCls =
   };
 
   return (
-  <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-3">
-  {/* PANEL */}
-  <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-    {/* HEADER (fixed) */}
-    <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
-          Customer
-        </p>
-        <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-white">
-          {editing ? "Edit Customer" : "Add Customer"}
-        </h2>
-      </div>
-
-      <button
-        type="button"
-        onClick={onClose}
-        className="cursor-pointer rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
-      >
-        <X size={20} />
-      </button>
-    </div>
-
-    {/* FORM wraps body + footer */}
-    <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-      {/* BODY (only scrolling part) */}
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
-        {/* CODE + NUID */}
-        <div className="grid grid-cols-2 gap-3">
+    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-3">
+      {/* PANEL */}
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        {/* HEADER (fixed) */}
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
           <div>
-            <label className="mb-1 block text-sm font-semibold">Code</label>
-            <input
-              value={form.code}
-              onChange={(e) => updateField("code", e.target.value.toUpperCase())}
-              className={inputCls}
-              placeholder="C001"
-            />
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+              Customer
+            </p>
+            <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-white">
+              {editing ? "Edit Customer" : "Add Customer"}
+            </h2>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold">NUID</label>
-            <input
-              value={form.nuid}
-              onChange={(e) => updateField("nuid", e.target.value.toUpperCase())}
-              className={inputCls}
-            />
-          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        {/* NAME */}
-        <div>
-          <label className="mb-1 block text-sm font-semibold">Name</label>
-          <input
-            value={form.name}
-            onChange={(e) => updateField("name", e.target.value.toUpperCase())}
-            className={inputCls}
-          />
-        </div>
+        {/* FORM wraps body + footer */}
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          {/* BODY (only scrolling part) */}
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
+            {/* CODE + NUID */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-semibold">Code</label>
+                <input
+                  value={form.code}
+                  onChange={(e) =>
+                    updateField("code", e.target.value.toUpperCase())
+                  }
+                  className={inputCls}
+                  placeholder="C001"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold">NUID</label>
+                <input
+                  value={form.nuid}
+                  onChange={(e) =>
+                    updateField("nuid", e.target.value.toUpperCase())
+                  }
+                  className={inputCls}
+                />
+              </div>
+            </div>
 
-        {/* MOBILE + PACKAGE */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-semibold">Mobile</label>
-            <input
-              value={form.mobile}
-              onChange={(e) => updateField("mobile", e.target.value)}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold">Package</label>
-            <input
-              type="number"
-              min="0"
-              value={form.packageAmount}
-              onChange={(e) => updateField("packageAmount", e.target.value)}
-              placeholder="₹500"
-              className={inputCls}
-            />
-          </div>
-        </div>
+            {/* NAME */}
+            <div>
+              <label className="mb-1 block text-sm font-semibold">Name</label>
+              <input
+                value={form.name}
+                onChange={(e) =>
+                  updateField("name", e.target.value.toUpperCase())
+                }
+                className={inputCls}
+              />
+            </div>
 
-        {/* BILLING START */}
-        <div>
-          <label className="mb-1 block text-sm font-semibold">Billing Start</label>
-          <div className="grid grid-cols-2 gap-3">
-            <select
-              value={form.billingStartMonth}
-              onChange={(e) => updateField("billingStartMonth", e.target.value)}
-              className={inputCls}
-            >
-              <option value="">Select Month</option>
-              {MONTHS.map((month, index) => (
-                <option key={index + 1} value={index + 1}>
-                  {month}
-                </option>
-              ))}
-            </select>
+            {/* MOBILE + PACKAGE */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-semibold">
+                  Mobile
+                </label>
+                <input
+                  value={form.mobile}
+                  onChange={(e) => updateField("mobile", e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold">
+                  Package
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.packageAmount}
+                  onChange={(e) => updateField("packageAmount", e.target.value)}
+                  placeholder="₹500"
+                  className={inputCls}
+                />
+              </div>
+            </div>
 
-            <select
-              value={form.billingStartYear}
-              onChange={(e) => updateField("billingStartYear", e.target.value)}
-              className={inputCls}
-            >
-              <option value="">Select Year</option>
-              {Array.from({ length: 6 }, (_, i) => currentYear - i).map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* STATUS */}
-        <div>
-          <label className="mb-1 block text-sm font-semibold">Status</label>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { value: "active", label: "Active" },
-              { value: "inactive", label: "DC" },
-              { value: "free", label: "Free" },
-            ].map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => updateField("status", opt.value)}
-                className={`rounded-xl border px-3 py-3 text-sm font-bold transition ${
-                  form.status === opt.value
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-400"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          {editing && (
-            <div className="mt-3">
-              <label className="mb-1 block text-xs font-semibold text-slate-500">
-                Apply this status starting from
+            {/* BILLING START */}
+            <div>
+              <label className="mb-1 block text-sm font-semibold">
+                Billing Start
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <select
-                  value={form.statusMonth}
-                  onChange={(e) => updateField("statusMonth", e.target.value)}
+                  value={form.billingStartMonth}
+                  onChange={(e) =>
+                    updateField("billingStartMonth", e.target.value)
+                  }
                   className={inputCls}
                 >
-                  {MONTHS.map((m, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {m}
+                  <option value="">Select Month</option>
+                  {MONTHS.map((month, index) => (
+                    <option key={index + 1} value={index + 1}>
+                      {month}
                     </option>
                   ))}
                 </select>
+
                 <select
-                  value={form.statusYear}
-                  onChange={(e) => updateField("statusYear", e.target.value)}
+                  value={form.billingStartYear}
+                  onChange={(e) =>
+                    updateField("billingStartYear", e.target.value)
+                  }
                   className={inputCls}
                 >
-                  {Array.from({ length: 6 }, (_, i) => currentYear - i).map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
+                  <option value="">Select Year</option>
+                  {Array.from({ length: 6 }, (_, i) => currentYear - i).map(
+                    (year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ),
+                  )}
                 </select>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* LOCATION */}
-        <div>
-          <label className="mb-1 block text-sm font-semibold">Location</label>
-          <select
-            value={form.location}
-            onChange={(e) => updateField("location", e.target.value)}
-            className={inputCls}
-          >
-            <option value="">Select Location</option>
-            {locations.map((location) => (
-              <option key={location._id} value={location._id}>
-                {location.name}
-              </option>
-            ))}
-          </select>
-        </div>
+            {/* STATUS */}
+            <div>
+              <label className="mb-1 block text-sm font-semibold">Status</label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "DC" },
+                  { value: "free", label: "Free" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => updateField("status", opt.value)}
+                    className={`rounded-xl border px-3 py-3 text-sm font-bold transition ${
+                      form.status === opt.value
+                        ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-400"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {editing && (
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs font-semibold text-slate-500">
+                    Apply this status starting from
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      value={form.statusMonth}
+                      onChange={(e) =>
+                        updateField("statusMonth", e.target.value)
+                      }
+                      className={inputCls}
+                    >
+                      {MONTHS.map((m, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={form.statusYear}
+                      onChange={(e) =>
+                        updateField("statusYear", e.target.value)
+                      }
+                      className={inputCls}
+                    >
+                      {Array.from({ length: 6 }, (_, i) => currentYear - i).map(
+                        (y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* LOCATION */}
+            <div>
+              <label className="mb-1 block text-sm font-semibold">
+                Location
+              </label>
+              <select
+                value={form.location}
+                onChange={(e) => updateField("location", e.target.value)}
+                className={inputCls}
+              >
+                <option value="">Select Location</option>
+                {locations.map((location) => (
+                  <option key={location._id} value={location._id}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* FOOTER BUTTONS (fixed, always visible) */}
+          <div className="flex shrink-0 gap-3 border-t border-slate-200 p-4 dark:border-slate-700 sm:px-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 cursor-pointer rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex flex-[1.5] cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Save size={17} className="shrink-0" />
+              {saving
+                ? "Saving..."
+                : editing
+                  ? "Update Customer"
+                  : "Add Customer"}
+            </button>
+          </div>
+        </form>
       </div>
-
-      {/* FOOTER BUTTONS (fixed, always visible) */}
-      <div className="flex shrink-0 gap-3 border-t border-slate-200 p-4 dark:border-slate-700 sm:px-6">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 cursor-pointer rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
-          Cancel
-        </button>
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="flex flex-[1.5] cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Save size={17} className="shrink-0" />
-          {saving ? "Saving..." : editing ? "Update Customer" : "Add Customer"}
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
+    </div>
   );
 }
 const normKey = (k) =>
@@ -4201,9 +4313,19 @@ export default function Customers() {
   const { monthBeforePrevious, previousMonth, currentMonthInfo } =
     useCurrentMonthInfo();
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [customers, setCustomers] = useState([]);
-  const [locations, setLocations] = useState([]);
-  const [payments, setPayments] = useState([]);
+  const customersLive = useLiveQuery(() => db.customers.toArray(), []);
+  const locationsLive = useLiveQuery(() => db.locations.toArray(), []);
+  const paymentsLive = useLiveQuery(() => db.payments.toArray(), []);
+  const customers = customersLive ?? EMPTY;
+  const locations = locationsLive ?? EMPTY;
+
+  const payments = useMemo(() => {
+    const map = new Map(customers.map((c) => [String(c._id), c]));
+    return (paymentsLive ?? EMPTY).map((p) => {
+      const cid = String(p.customer?._id || p.customer);
+      return { ...p, customer: map.get(cid) || p.customer };
+    });
+  }, [paymentsLive, customers]);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [balanceCustomer, setBalanceCustomer] = useState(null);
   const [paymentCustomer, setPaymentCustomer] = useState(null);
@@ -4227,7 +4349,8 @@ export default function Customers() {
     () => localStorage.getItem("customerView") || "cards",
   );
 
-  const [loading, setLoading] = useState(true);
+    const [initialSync, setInitialSync] = useState(() => !localStorage.getItem("lastSync"));
+  const loading = customersLive === undefined || initialSync;
   const [error, setError] = useState("");
 
   const [showFilters, setShowFilters] = useState(false);
@@ -4246,9 +4369,8 @@ export default function Customers() {
   // ====================================================
   // FILTER
   // ====================================================
-  // Customers who have at least one payment by the selected collector in the CURRENT month
   const collectorCustomerIds = useMemo(() => {
-    if (selectedCollector === "ALL") return null; // null = no collector filtering
+    if (selectedCollector === "ALL") return null; 
     const ids = new Set();
     payments.forEach((p) => {
       if (p.addedBy !== selectedCollector) return;
@@ -4287,7 +4409,7 @@ export default function Customers() {
 
       return matchesSearch && matchesLocation && matchesCollector;
     });
-  }, [customers, search, selectedLocation, collectorCustomerIds]);
+    }, [customers, deferredSearch, selectedLocation, collectorCustomerIds]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
   const toggleSort = (key) => {
@@ -4369,35 +4491,44 @@ export default function Customers() {
     );
   };
   const tableFooterTotals = useMemo(() => {
-    const getEntry = (customer, month, year) =>
-      (customer.monthlyBilling || []).find(
-        (m) => m.month === month && m.year === year,
-      );
-
     return filteredCustomers.reduce(
-      (acc, customer) => {
-        const old = getEntry(
-          customer,
+      (acc, c) => {
+        acc.oldPaid += getMonthPaidAmount(
+          payments,
+          c._id,
           monthBeforePrevious.number,
           monthBeforePrevious.year,
         );
-        const prev = getEntry(
-          customer,
+        acc.oldBalance += getMonthBalanceCalc(
+          c,
+          payments,
+          monthBeforePrevious.number,
+          monthBeforePrevious.year,
+        );
+        acc.prevPaid += getMonthPaidAmount(
+          payments,
+          c._id,
           previousMonth.number,
           previousMonth.year,
         );
-        const curr = getEntry(
-          customer,
+        acc.prevBalance += getMonthBalanceCalc(
+          c,
+          payments,
+          previousMonth.number,
+          previousMonth.year,
+        );
+        acc.currPaid += getMonthPaidAmount(
+          payments,
+          c._id,
           currentMonthInfo.number,
           currentMonthInfo.year,
         );
-
-        acc.oldPaid += old?.paid ?? 0;
-        acc.oldBalance += old?.balance ?? 0;
-        acc.prevPaid += prev?.paid ?? 0;
-        acc.prevBalance += prev?.balance ?? 0;
-        acc.currPaid += curr?.paid ?? 0;
-        acc.currBalance += curr?.balance ?? 0;
+        acc.currBalance += getMonthBalanceCalc(
+          c,
+          payments,
+          currentMonthInfo.number,
+          currentMonthInfo.year,
+        );
         return acc;
       },
       {
@@ -4409,7 +4540,13 @@ export default function Customers() {
         currBalance: 0,
       },
     );
-  }, [filteredCustomers, monthBeforePrevious, previousMonth, currentMonthInfo]);
+  }, [
+    filteredCustomers,
+    payments,
+    monthBeforePrevious,
+    previousMonth,
+    currentMonthInfo,
+  ]);
 
   const toggleSelectAll = () => {
     if (selectedCustomers.length === filteredCustomers.length) {
@@ -4419,96 +4556,113 @@ export default function Customers() {
     }
   };
 
-  // ====================================================
-  // LOAD CUSTOMERS
-  // ====================================================
-  const loadCustomers = async (silent = false) => {
-    try {
-      if (!silent) setLoading(true);
-      setError("");
-      const response = await api.get("/customers");
-      setCustomers(response.data.data || []);
-    } catch (error) {
-      console.error("Failed to load customers:", error);
-      setError(error.response?.data?.message || "Unable to load customers");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // // ====================================================
+  // // LOAD CUSTOMERS
+  // // ====================================================
+  // const loadCustomers = async (silent = false) => {
+  //   try {
+  //     if (!silent) setLoading(true);
+  //     setError("");
+  //     const response = await api.get("/customers");
+  //     setCustomers(response.data.data || []);
+  //   } catch (error) {
+  //     console.error("Failed to load customers:", error);
+  //     setError(error.response?.data?.message || "Unable to load customers");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
-  // ====================================================
-  // LOAD LOCATIONS
-  // ====================================================
+  // // ====================================================
+  // // LOAD LOCATIONS
+  // // ====================================================
 
-  const loadLocations = async () => {
-    try {
-      const response = await api.get("/locations");
+  // const loadLocations = async () => {
+  //   try {
+  //     const response = await api.get("/locations");
 
-      setLocations(response.data.data || []);
-    } catch (error) {
-      console.error("Failed to load locations:", error);
-    }
-  };
-  // ====================================================
-  // LOAD ALL PAYMENT RECORDS
-  // ====================================================
-  const loadPayments = async () => {
-    try {
-      const response = await api.get("/payments");
+  //     setLocations(response.data.data || []);
+  //   } catch (error) {
+  //     console.error("Failed to load locations:", error);
+  //   }
+  // };
+  // // ====================================================
+  // // LOAD ALL PAYMENT RECORDS
+  // // ====================================================
+  // const loadPayments = async () => {
+  //   try {
+  //     const response = await api.get("/payments");
 
-      console.log("PAYMENTS API RESPONSE:", response.data);
-      const paymentData = response.data?.data || response.data?.payments || [];
-      console.log("PAYMENTS LOADED:", paymentData);
-      setPayments(Array.isArray(paymentData) ? paymentData : []);
-    } catch (error) {
-      console.error(
-        "FAILED TO LOAD PAYMENTS:",
-        error.response?.data || error.message,
-      );
+  //     console.log("PAYMENTS API RESPONSE:", response.data);
+  //     const paymentData = response.data?.data || response.data?.payments || [];
+  //     console.log("PAYMENTS LOADED:", paymentData);
+  //     setPayments(Array.isArray(paymentData) ? paymentData : []);
+  //   } catch (error) {
+  //     console.error(
+  //       "FAILED TO LOAD PAYMENTS:",
+  //       error.response?.data || error.message,
+  //     );
 
-      setPayments([]);
-    }
-  };
+  //     setPayments([]);
+  //   }
+  // };
 
-  // ====================================================
-  // LOAD CURRENT MONTH COLLECTION
-  // ====================================================
-  const loadCollection = async () => {
-    try {
-      const response = await api.get("/payments/current-month");
+  // // ====================================================
+  // // LOAD CURRENT MONTH COLLECTION
+  // // ====================================================
+  // const loadCollection = async () => {
+  //   try {
+  //     const response = await api.get("/payments/current-month");
 
-      console.log("CURRENT MONTH COLLECTION:", response.data);
+  //     console.log("CURRENT MONTH COLLECTION:", response.data);
 
-      const data = response.data?.data || response.data || {};
+  //     const data = response.data?.data || response.data || {};
 
-      setCollectionStats({
-        total: Number(data.total || 0),
-        rajesh: Number(data.rajesh || 0),
-        shivam: Number(data.shivam || 0),
-        count: Number(data.count || 0),
-        month: Number(data.month || currentMonth),
-        year: Number(data.year || currentYear),
-      });
-    } catch (error) {
-      console.error(
-        "FAILED TO LOAD COLLECTION:",
-        error.response?.data || error.message,
-      );
-    }
-  };
-  // ====================================================
-  // INITIAL LOAD
-  // ====================================================
+  //     setCollectionStats({
+  //       total: Number(data.total || 0),
+  //       rajesh: Number(data.rajesh || 0),
+  //       shivam: Number(data.shivam || 0),
+  //       count: Number(data.count || 0),
+  //       month: Number(data.month || currentMonth),
+  //       year: Number(data.year || currentYear),
+  //     });
+  //   } catch (error) {
+  //     console.error(
+  //       "FAILED TO LOAD COLLECTION:",
+  //       error.response?.data || error.message,
+  //     );
+  //   }
+  // };
+  // // ====================================================
+  // // INITIAL LOAD
+  // // ====================================================
+
+  // useEffect(() => {
+  //   Promise.all([
+  //     loadCustomers(),
+  //     loadLocations(),
+  //     loadPayments(),
+  //     loadCollection(),
+  //   ]);
+  // }, []);
+  // Screens read the local database automatically.
+  // These just refresh it from the server when online.
+  const loadCustomers = async () => { await syncNow(); };
+  const loadPayments = async () => { await syncNow(); };
+  const loadLocations = async () => {};
+  const loadCollection = async () => {};
 
   useEffect(() => {
-    Promise.all([
-      loadCustomers(),
-      loadLocations(),
-      loadPayments(),
-      loadCollection(),
-    ]);
+    startAutoSync();
+    const timer = setTimeout(() => setInitialSync(false), 8000); // never wait more than 8s
+    syncNow()
+      .catch((e) => console.log("SYNC ERROR:", e))
+      .finally(() => {
+        clearTimeout(timer);
+        setInitialSync(false);
+      });
+    return () => clearTimeout(timer);
   }, []);
-
   // ====================================================
   // REFRESH ALL DATA
   // ====================================================
@@ -4820,6 +4974,7 @@ export default function Customers() {
                 Customers
               </h1>
             </div>
+            <SyncStatus />
             {/* <TestClockWidget /> */}
             {/* Actions */}
             <div className="flex items-center gap-1">
@@ -5444,7 +5599,7 @@ export default function Customers() {
             }}
           />
         )}
-        {paymentCustomer && (
+                        {paymentCustomer && (
           <PaymentModal
             customer={paymentCustomer}
             payments={payments}
