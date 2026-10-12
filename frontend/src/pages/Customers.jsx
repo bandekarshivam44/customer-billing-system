@@ -460,7 +460,7 @@ function BalanceModal({ customer, payments = [], onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-3">
+    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2  sm:p-3">
       {/* Panel: as tall as content needs, capped to the screen */}
       <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
         {/* Header (fixed) */}
@@ -735,7 +735,7 @@ function PaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 ">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         {/* ================= HEADER ================= */}
         <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-4 dark:border-slate-700 dark:bg-slate-800/60">
@@ -981,7 +981,7 @@ function CollectionModal({ summary, onClose }) {
     summary.old.shivam + summary.previous.shivam + summary.current.shivam;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 ">
       <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         {/* HEADER */}
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
@@ -1078,7 +1078,7 @@ function LocationSummaryModal({ summary, onClose }) {
   const grandCollection = summary.reduce((s, l) => s + l.collectionTotal, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 ">
       <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
           <div>
@@ -1174,7 +1174,7 @@ function TransactionsModal({ payments, customerLocationMap, onClose }) {
   const total = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 ">
       <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
           <div>
@@ -1606,8 +1606,10 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
 
   const [customer, setCustomer] = useState(null);
   const [payments, setPayments] = useState([]);
-    const [initialSync, setInitialSync] = useState(() => !localStorage.getItem("lastSync"));
-    const [loading, setLoading] = useState(true);
+  const [initialSync, setInitialSync] = useState(
+    () => !localStorage.getItem("lastSync"),
+  );
+  const [loading, setLoading] = useState(true);
   const [paymentsLoading, setPaymentsLoading] = useState(true);
   const [showPayment, setShowPayment] = useState(false);
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -1733,7 +1735,7 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 ">
         <div className="rounded-2xl bg-white p-8 text-center dark:bg-slate-900">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-600 dark:border-slate-700 dark:border-t-indigo-400" />
           <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
@@ -1746,7 +1748,7 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
 
   if (!customer) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 ">
         <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <p className="font-semibold text-slate-700 dark:text-slate-200">
             Customer not found
@@ -1764,7 +1766,7 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 ">
       <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-slate-50 p-4 shadow-2xl dark:bg-slate-950 sm:p-6">
         <div className="border-b rounded-t-2xl border-slate-200 bg-slate-50/80 px-5 py-4 dark:border-slate-700 dark:bg-slate-800/60">
           {" "}
@@ -2552,7 +2554,7 @@ function ExportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 ">
       <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         {/* HEADER */}
 
@@ -3179,7 +3181,7 @@ function StatCard({
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
             {title}
-          </p>            
+          </p>
           {/* Show status counts ONLY for Customer Status card */}
           {title === "Customer Status" ? (
             <div className="mt-3 flex flex-col items-right gap-x-3 gap-y-1 text-sm">
@@ -3265,7 +3267,7 @@ function BulkAssignLocationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 ">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
           <div>
@@ -3460,7 +3462,7 @@ function CustomerFormModal({ customer, locations, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-3">
+    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-2  sm:p-3">
       {/* PANEL */}
       <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         {/* HEADER (fixed) */}
@@ -4141,7 +4143,7 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
           <div>
@@ -4325,6 +4327,15 @@ export default function Customers() {
       return { ...p, customer: map.get(cid) || p.customer };
     });
   }, [paymentsLive, customers]);
+    const paymentsByCustomer = useMemo(() => {
+    const m = new Map();
+    payments.forEach((p) => {
+      const k = String(p.customer?._id || p.customer);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(p);
+    });
+    return m;
+  }, [payments]);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [balanceCustomer, setBalanceCustomer] = useState(null);
   const [paymentCustomer, setPaymentCustomer] = useState(null);
@@ -4348,7 +4359,9 @@ export default function Customers() {
     () => localStorage.getItem("customerView") || "cards",
   );
 
-    const [initialSync, setInitialSync] = useState(() => !localStorage.getItem("lastSync"));
+  const [initialSync, setInitialSync] = useState(
+    () => !localStorage.getItem("lastSync"),
+  );
   const loading = customersLive === undefined || initialSync;
   const [error, setError] = useState("");
 
@@ -4369,7 +4382,7 @@ export default function Customers() {
   // FILTER
   // ====================================================
   const collectorCustomerIds = useMemo(() => {
-    if (selectedCollector === "ALL") return null; 
+    if (selectedCollector === "ALL") return null;
     const ids = new Set();
     payments.forEach((p) => {
       if (p.addedBy !== selectedCollector) return;
@@ -4408,7 +4421,7 @@ export default function Customers() {
 
       return matchesSearch && matchesLocation && matchesCollector;
     });
-    }, [customers, deferredSearch, selectedLocation, collectorCustomerIds]);
+  }, [customers, deferredSearch, selectedLocation, collectorCustomerIds]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
   const toggleSort = (key) => {
@@ -4646,8 +4659,12 @@ export default function Customers() {
   // }, []);
   // Screens read the local database automatically.
   // These just refresh it from the server when online.
-  const loadCustomers = async () => { await syncNow(); };
-  const loadPayments = async () => { await syncNow(); };
+  const loadCustomers = async () => {
+    await syncNow();
+  };
+  const loadPayments = async () => {
+    await syncNow();
+  };
   const loadLocations = async () => {};
   const loadCollection = async () => {};
 
@@ -5047,17 +5064,17 @@ export default function Customers() {
 
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
-  icon={Users}
-  title="Total Customers"
-  value={customers.length}
-  subtitle={
-    <div className="space-y-2">
-      <p>All registered customers</p>
-      <SyncStatus />
-    </div>
-  }
-  iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
-/>
+            icon={Users}
+            title="Total Customers"
+            value={customers.length}
+            subtitle={
+              <div className="space-y-2">
+                <p>All registered customers</p>
+                {/* <SyncStatus /> */}
+              </div>
+            }
+            iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
+          />
           <StatCard
             icon={UserCheck}
             title="Customer Status"
@@ -5125,7 +5142,12 @@ export default function Customers() {
             icon={Clock3}
             title="Payment Pending"
             value={`₹${pendingAmount.toLocaleString("en-IN")}`}
-            subtitle="Outstanding balance"
+            subtitle={
+              <div className="space-y-2">
+                <p className="mb-3">Outstanding balance</p>
+                <SyncStatus />
+              </div>
+            }
             iconClass="bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-300"
           />
         </div>
@@ -5352,7 +5374,7 @@ export default function Customers() {
               <MemoizedCustomerCard
                 key={customer._id}
                 customer={customer}
-                payments={payments}
+                payments={paymentsByCustomer.get(String(customer._id)) || EMPTY}
                 currentMonthInfo={currentMonthInfo}
                 onClick={() => handleCustomerClick(customer)}
                 onAddPayment={() => handleAddPayment(customer)}
@@ -5494,7 +5516,7 @@ export default function Customers() {
                     <MemoizedCustomerTableRow
                       key={customer._id}
                       customer={customer}
-                      payments={payments}
+                      payments={paymentsByCustomer.get(String(customer._id)) || EMPTY}
                       index={index}
                       monthBeforePrevious={monthBeforePrevious}
                       previousMonth={previousMonth}
@@ -5602,7 +5624,7 @@ export default function Customers() {
             }}
           />
         )}
-                        {paymentCustomer && (
+        {paymentCustomer && (
           <PaymentModal
             customer={paymentCustomer}
             payments={payments}
