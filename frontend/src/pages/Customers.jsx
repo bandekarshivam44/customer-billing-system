@@ -1621,8 +1621,8 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
   const [saving, setSaving] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
   const [paymentToDelete, setPaymentToDelete] = useState(null);
-const [deletingPayment, setDeletingPayment] = useState(false);
-const [deletePaymentError, setDeletePaymentError] = useState("");
+  const [deletingPayment, setDeletingPayment] = useState(false);
+  const [deletePaymentError, setDeletePaymentError] = useState("");
   const loadCustomer = async () => {
     try {
       setLoading(true);
@@ -1687,60 +1687,53 @@ const [deletePaymentError, setDeletePaymentError] = useState("");
     await onChanged?.();
   };
 
-  
   const handleDeletePayment = (payment) => {
     setDeletePaymentError("");
     setPaymentToDelete(payment);
   };
 
-  
-const confirmDeletePayment = async () => {
-  if (!paymentToDelete || deletingPayment) return;
+  const confirmDeletePayment = async () => {
+    if (!paymentToDelete || deletingPayment) return;
 
-  const payment = paymentToDelete;
-
-  try {
-    setDeletingPayment(true);
-    setDeletePaymentError("");
-
-    if (payment.synced === 0 || payment.synced === -1) {
-      await deleteLocalPayment(payment.clientId);
-    } else {
-      if (!navigator.onLine) {
-        setDeletePaymentError(
-          "Internet is required to delete a saved payment."
-        );
-        return;
-      }
-
-      await api.delete(`/payments/${payment._id}`);
-    }
-
-    // The deletion succeeded. Close the confirmation dialog immediately.
-    setPaymentToDelete(null);
-
-    // Refresh separately so a sync/refresh error isn't reported as a
-    // payment deletion failure.
+    const payment = paymentToDelete;
+    // console.log("Payment selected for deletion:", payment);
+    // console.log("Payment allocations:", payment.allocations);
     try {
-      await reloadAfterChange();
-    } catch (refreshError) {
-      console.error("Payment deleted, but refresh failed:", refreshError);
-      alert(
-        "Payment deleted, but the payment history could not refresh. Please refresh the page."
+      setDeletingPayment(true);
+      setDeletePaymentError("");
+
+      if (payment.synced === 0 || payment.synced === -1) {
+        await deleteLocalPayment(payment.clientId);
+      } else {
+        if (!navigator.onLine) {
+          setDeletePaymentError(
+            "Internet is required to delete a saved payment.",
+          );
+          return;
+        }
+
+        await api.delete(`/payments/${payment._id}`);
+      }
+      setPaymentToDelete(null);
+      try {
+        await reloadAfterChange();
+      } catch (refreshError) {
+        console.error("Payment deleted, but refresh failed:", refreshError);
+        alert(
+          "Payment deleted, but the payment history could not refresh. Please refresh the page.",
+        );
+      }
+    } catch (error) {
+      console.error("Delete payment failed:", error);
+
+      setDeletePaymentError(
+        error.response?.data?.message ||
+          "Failed to delete payment. Please try again.",
       );
+    } finally {
+      setDeletingPayment(false);
     }
-  } catch (error) {
-    console.error("Delete payment failed:", error);
-
-    setDeletePaymentError(
-      error.response?.data?.message ||
-        "Failed to delete payment. Please try again."
-    );
-  } finally {
-    setDeletingPayment(false);
-  }
-};
-
+  };
 
   const totalPaid = useMemo(
     () =>
@@ -2034,153 +2027,157 @@ const confirmDeletePayment = async () => {
           }}
         />
       )}
-      
+
       {/* CUSTOM DELETE PAYMENT CONFIRMATION */}
-      
-{paymentToDelete && (
-  <div
-    className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
-    onClick={() => {
-      if (!deletingPayment) {
-        setPaymentToDelete(null);
-        setDeletePaymentError("");
-      }
-    }}
-  >
-    <div
-      role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="delete-payment-title"
-      aria-describedby="delete-payment-description"
-      className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {/* HEADER */}
-      <div className="flex items-start gap-3.5 px-5 pb-4 pt-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
-          <Trash2 size={20} />
-        </div>
 
-        <div className="min-w-0 flex-1 pt-0.5">
-          <h2
-            id="delete-payment-title"
-            className="text-base font-bold text-slate-900 dark:text-white"
-          >
-            Delete payment?
-          </h2>
-
-          <p
-            id="delete-payment-description"
-            className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400"
-          >
-            Delete this payment for{" "}<br />
-            <span className="font-semibold text-slate-800 dark:text-slate-100">
-              {customer?.name || "this customer"}
-            </span>
-            ?
-          </p>
-        </div>
-
-        <button
-          type="button"
-          disabled={deletingPayment}
+      {paymentToDelete && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
           onClick={() => {
-            setPaymentToDelete(null);
-            setDeletePaymentError("");
+            if (!deletingPayment) {
+              setPaymentToDelete(null);
+              setDeletePaymentError("");
+            }
           }}
-          aria-label="Close confirmation"
-          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 dark:hover:bg-slate-800 dark:hover:text-white"
         >
-          <X size={18} />
-        </button>
-      </div>
-
-      {/* PAYMENT DETAILS */}
-      <div className="px-5 pb-5">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50">
-          {/* AMOUNT */}
-          <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              Payment amount
-            </span>
-            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              ₹{Number(paymentToDelete.amount).toLocaleString("en-IN")}
-            </span>
-          </div>
-
-          <div className="mx-4 border-t border-slate-200 dark:border-slate-700" />
-
-          {/* COLLECTED BY */}
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              Collected by
-            </span>
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {paymentToDelete.collectedBy || "SHIVAM"}
-            </span>
-          </div>
-
-          <div className="mx-4 border-t border-slate-200 dark:border-slate-700" />
-
-          {/* BILLING MONTH */}
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              Applied to
-            </span>
-            <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">
-              {paymentToDelete.month || "October"}
-            </span>
-          </div>
-        </div>
-
-        {/* ERROR */}
-        {deletePaymentError && (
           <div
-            role="alert"
-            className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-payment-title"
+            aria-describedby="delete-payment-description"
+            className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
           >
-            {deletePaymentError}
+            {/* HEADER */}
+            <div className="flex items-start gap-3.5 px-5 pb-4 pt-5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                <Trash2 size={20} />
+              </div>
+
+              <div className="min-w-0 flex-1 pt-0.5">
+                <h2
+                  id="delete-payment-title"
+                  className="text-base font-bold text-slate-900 dark:text-white"
+                >
+                  Delete payment?
+                </h2>
+
+                <p
+                  id="delete-payment-description"
+                  className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400"
+                >
+                  Delete this payment for <br />
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">
+                    {customer?.name || "this customer"}
+                  </span>
+                  ?
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={deletingPayment}
+                onClick={() => {
+                  setPaymentToDelete(null);
+                  setDeletePaymentError("");
+                }}
+                aria-label="Close confirmation"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 dark:hover:bg-slate-800 dark:hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* PAYMENT DETAILS */}
+            <div className="px-5 pb-5">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50">
+                {/* AMOUNT */}
+                <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                  <span className="text-sm text-slate-500 dark:text-slate-400">
+                    Payment amount
+                  </span>
+                  <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    ₹{Number(paymentToDelete.amount).toLocaleString("en-IN")}
+                  </span>
+                </div>
+
+                <div className="mx-4 border-t border-slate-200 dark:border-slate-700" />
+
+                {/* COLLECTED BY */}
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <span className="text-sm text-slate-500 dark:text-slate-400">
+                    Collected by
+                  </span>
+                  <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {paymentToDelete.addedBy || "-"}
+                  </span>
+                </div>
+
+                <div className="mx-4 border-t border-slate-200 dark:border-slate-700" />
+
+                {/* BILLING MONTH */}
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <span className="text-sm text-slate-500 dark:text-slate-400">
+                    Applied to
+                  </span>
+                  <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">
+                    {paymentToDelete.allocations?.length
+                      ? paymentToDelete.allocations
+                          .map((allocation) => allocation.label)
+                          .filter(Boolean)
+                          .join(", ")
+                      : "-"}
+                  </span>
+                </div>
+              </div>
+
+              {/* ERROR */}
+              {deletePaymentError && (
+                <div
+                  role="alert"
+                  className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+                >
+                  {deletePaymentError}
+                </div>
+              )}
+            </div>
+
+            {/* FOOTER */}
+            <div className="flex flex-col-reverse gap-2.5 border-t border-slate-100 bg-slate-50/70 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/30 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={deletingPayment}
+                onClick={() => {
+                  setPaymentToDelete(null);
+                  setDeletePaymentError("");
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:min-w-24"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={deletingPayment}
+                onClick={confirmDeletePayment}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-500/25 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-32"
+              >
+                {deletingPayment ? (
+                  <>
+                    <RefreshCw size={15} className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={15} />
+                    Delete payment
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* FOOTER */}
-      <div className="flex flex-col-reverse gap-2.5 border-t border-slate-100 bg-slate-50/70 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/30 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          disabled={deletingPayment}
-          onClick={() => {
-            setPaymentToDelete(null);
-            setDeletePaymentError("");
-          }}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:min-w-24"
-        >
-          Cancel
-        </button>
-
-        <button
-          type="button"
-          disabled={deletingPayment}
-          onClick={confirmDeletePayment}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-500/25 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-32"
-        >
-          {deletingPayment ? (
-            <>
-              <RefreshCw size={15} className="animate-spin" />
-              Deleting...
-            </>
-          ) : (
-            <>
-              <Trash2 size={15} />
-              Delete payment
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+        </div>
+      )}
     </div>
   );
 }
@@ -2279,14 +2276,14 @@ function CustomerCard({
         {/* DETAILS */}
         <div className="mt-5 grid grid-cols-2 gap-3">
           {/* NUID */}
-{/* NUID - ENTIRE OUTER BOX IS CLICKABLE */}
-<div className="rounded-xl border border-transparent bg-slate-50 p-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40">
-  <CopyableNUID
-    value={customer.nuid || "-"}
-    variant="card"
-    className="w-full rounded-lg p-0 hover:bg-transparent focus:ring-0"
-  />
-</div>
+          {/* NUID - ENTIRE OUTER BOX IS CLICKABLE */}
+          <div className="rounded-xl border border-transparent bg-slate-50 p-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40">
+            <CopyableNUID
+              value={customer.nuid || "-"}
+              variant="card"
+              className="w-full rounded-lg p-0 hover:bg-transparent focus:ring-0"
+            />
+          </div>
 
           {/* PACKAGE */}
           <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
@@ -2896,11 +2893,7 @@ function ExportModal({
     </div>
   );
 }
-function CopyableNUID({
-  value,
-  variant = "table",
-  className = "",
-}) {
+function CopyableNUID({ value, variant = "table", className = "" }) {
   const [copied, setCopied] = useState(false);
 
   const hasValue = Boolean(value && value !== "-");
@@ -2955,11 +2948,11 @@ function CopyableNUID({
         disabled={!hasValue}
         title={hasValue ? "Click to copy NUID" : "No NUID available"}
         aria-label={hasValue ? `Copy NUID ${value}` : "No NUID available"}
-className={`group min-w-0 text-left ${
-  variant === "card"
-    ? "block w-full cursor-pointer focus:outline-none"
-    : "inline-flex max-w-full cursor-pointer flex-col items-start rounded-md px-2 py-1 transition hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:hover:bg-indigo-950/60"
-} disabled:cursor-default ${className}`}
+        className={`group min-w-0 text-left ${
+          variant === "card"
+            ? "block w-full cursor-pointer focus:outline-none"
+            : "inline-flex max-w-full cursor-pointer flex-col items-start rounded-md px-2 py-1 transition hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:hover:bg-indigo-950/60"
+        } disabled:cursor-default ${className}`}
       >
         <span className="flex items-center gap-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
@@ -2986,24 +2979,21 @@ className={`group min-w-0 text-left ${
       {/* GLOBAL TOAST: ALWAYS AT THE BOTTOM-CENTRE OF THE SCREEN */}
       {copied &&
         createPortal(
-          <div
-  className="pointer-events-none fixed inset-x-0 bottom-6 z-[99999] flex justify-center px-4"
->
-  <div
-    role="status"
-    aria-live="polite"
-    className="flex items-center gap-2 whitespace-nowrap rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-xl dark:border-emerald-900 dark:bg-slate-900 dark:text-white"
-    style={{
-      animation: "copyToastSlideUp 220ms ease-out",
-    }}
-  >
-    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
-      <Check size={13} strokeWidth={3} />
-    </span>
-
-    Copied!
-  </div>
-</div>,
+          <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[99999] flex justify-center px-4">
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-center gap-2 whitespace-nowrap rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-xl dark:border-emerald-900 dark:bg-slate-900 dark:text-white"
+              style={{
+                animation: "copyToastSlideUp 220ms ease-out",
+              }}
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                <Check size={13} strokeWidth={3} />
+              </span>
+              Copied!
+            </div>
+          </div>,
           document.body,
         )}
     </>
@@ -3502,9 +3492,9 @@ function StatCard({
               </p>
 
               {subtitle && (
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {subtitle}
-                </p>
+                </div>
               )}
             </>
           )}
@@ -6016,22 +6006,18 @@ export default function Customers() {
       </div>
       {/* SCROLL TO TOP */}
       <button
-  type="button"
-  onClick={scrollToTop}
-  aria-label="Scroll to top"
-  title="Scroll to top"
-  className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:border-indigo-700 hover:bg-indigo-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-indigo-500 dark:bg-indigo-600 dark:text-white dark:shadow-indigo-500/20 dark:hover:border-indigo-700 dark:hover:bg-indigo-700 ${
-  showScrollTop
-    ? "translate-y-0 scale-100 opacity-100"
-    : "pointer-events-none translate-y-4 scale-90 opacity-0"
-}`}
->
-  <ChevronRight
-    size={22}
-    className="-rotate-90"
-    strokeWidth={2}
-  />
-</button>
+        type="button"
+        onClick={scrollToTop}
+        aria-label="Scroll to top"
+        title="Scroll to top"
+        className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:border-indigo-700 hover:bg-indigo-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-indigo-500 dark:bg-indigo-600 dark:text-white dark:shadow-indigo-500/20 dark:hover:border-indigo-700 dark:hover:bg-indigo-700 ${
+          showScrollTop
+            ? "translate-y-0 scale-100 opacity-100"
+            : "pointer-events-none translate-y-4 scale-90 opacity-0"
+        }`}
+      >
+        <ChevronRight size={22} className="-rotate-90" strokeWidth={2} />
+      </button>
     </div>
   );
 }
