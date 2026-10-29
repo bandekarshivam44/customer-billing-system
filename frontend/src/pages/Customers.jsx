@@ -1620,6 +1620,9 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
+  const [paymentToDelete, setPaymentToDelete] = useState(null);
+const [deletingPayment, setDeletingPayment] = useState(false);
+const [deletePaymentError, setDeletePaymentError] = useState("");
   const loadCustomer = async () => {
     try {
       setLoading(true);
@@ -1684,29 +1687,61 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
     await onChanged?.();
   };
 
-  const handleDeletePayment = async (p) => {
-    const ok = window.confirm(
-      `Delete this payment of ₹${Number(p.amount).toLocaleString("en-IN")}?\nThe balance will be restored.`,
-    );
-    if (!ok) return;
-
-    try {
-      if (p.synced === 0 || p.synced === -1) {
-        // never reached the server, so just remove it from this device
-        await deleteLocalPayment(p.clientId);
-      } else {
-        if (!navigator.onLine) {
-          alert("Deleting a saved payment needs internet.");
-          return;
-        }
-        await api.delete(`/payments/${p._id}`);
-      }
-      await reloadAfterChange();
-    } catch (error) {
-      console.error("Delete payment failed:", error);
-      alert(error.response?.data?.message || "Failed to delete payment.");
-    }
+  
+  const handleDeletePayment = (payment) => {
+    setDeletePaymentError("");
+    setPaymentToDelete(payment);
   };
+
+  
+const confirmDeletePayment = async () => {
+  if (!paymentToDelete || deletingPayment) return;
+
+  const payment = paymentToDelete;
+
+  try {
+    setDeletingPayment(true);
+    setDeletePaymentError("");
+
+    if (payment.synced === 0 || payment.synced === -1) {
+      await deleteLocalPayment(payment.clientId);
+    } else {
+      if (!navigator.onLine) {
+        setDeletePaymentError(
+          "Internet is required to delete a saved payment."
+        );
+        return;
+      }
+
+      await api.delete(`/payments/${payment._id}`);
+    }
+
+    // The deletion succeeded. Close the confirmation dialog immediately.
+    setPaymentToDelete(null);
+
+    // Refresh separately so a sync/refresh error isn't reported as a
+    // payment deletion failure.
+    try {
+      await reloadAfterChange();
+    } catch (refreshError) {
+      console.error("Payment deleted, but refresh failed:", refreshError);
+      alert(
+        "Payment deleted, but the payment history could not refresh. Please refresh the page."
+      );
+    }
+  } catch (error) {
+    console.error("Delete payment failed:", error);
+
+    setDeletePaymentError(
+      error.response?.data?.message ||
+        "Failed to delete payment. Please try again."
+    );
+  } finally {
+    setDeletingPayment(false);
+  }
+};
+
+
   const totalPaid = useMemo(
     () =>
       payments.reduce(
@@ -1999,6 +2034,153 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
           }}
         />
       )}
+      
+      {/* CUSTOM DELETE PAYMENT CONFIRMATION */}
+      
+{paymentToDelete && (
+  <div
+    className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
+    onClick={() => {
+      if (!deletingPayment) {
+        setPaymentToDelete(null);
+        setDeletePaymentError("");
+      }
+    }}
+  >
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="delete-payment-title"
+      aria-describedby="delete-payment-description"
+      className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* HEADER */}
+      <div className="flex items-start gap-3.5 px-5 pb-4 pt-5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
+          <Trash2 size={20} />
+        </div>
+
+        <div className="min-w-0 flex-1 pt-0.5">
+          <h2
+            id="delete-payment-title"
+            className="text-base font-bold text-slate-900 dark:text-white"
+          >
+            Delete payment?
+          </h2>
+
+          <p
+            id="delete-payment-description"
+            className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400"
+          >
+            Delete this payment for{" "}<br />
+            <span className="font-semibold text-slate-800 dark:text-slate-100">
+              {customer?.name || "this customer"}
+            </span>
+            ?
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled={deletingPayment}
+          onClick={() => {
+            setPaymentToDelete(null);
+            setDeletePaymentError("");
+          }}
+          aria-label="Close confirmation"
+          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 dark:hover:bg-slate-800 dark:hover:text-white"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* PAYMENT DETAILS */}
+      <div className="px-5 pb-5">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50">
+          {/* AMOUNT */}
+          <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              Payment amount
+            </span>
+            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              ₹{Number(paymentToDelete.amount).toLocaleString("en-IN")}
+            </span>
+          </div>
+
+          <div className="mx-4 border-t border-slate-200 dark:border-slate-700" />
+
+          {/* COLLECTED BY */}
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              Collected by
+            </span>
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {paymentToDelete.collectedBy || "SHIVAM"}
+            </span>
+          </div>
+
+          <div className="mx-4 border-t border-slate-200 dark:border-slate-700" />
+
+          {/* BILLING MONTH */}
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              Applied to
+            </span>
+            <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">
+              {paymentToDelete.month || "October"}
+            </span>
+          </div>
+        </div>
+
+        {/* ERROR */}
+        {deletePaymentError && (
+          <div
+            role="alert"
+            className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+          >
+            {deletePaymentError}
+          </div>
+        )}
+      </div>
+
+      {/* FOOTER */}
+      <div className="flex flex-col-reverse gap-2.5 border-t border-slate-100 bg-slate-50/70 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/30 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          disabled={deletingPayment}
+          onClick={() => {
+            setPaymentToDelete(null);
+            setDeletePaymentError("");
+          }}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:min-w-24"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          disabled={deletingPayment}
+          onClick={confirmDeletePayment}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-500/25 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-32"
+        >
+          {deletingPayment ? (
+            <>
+              <RefreshCw size={15} className="animate-spin" />
+              Deleting...
+            </>
+          ) : (
+            <>
+              <Trash2 size={15} />
+              Delete payment
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
