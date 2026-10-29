@@ -29,75 +29,24 @@ async function push() {
     if (stuck) throw new Error("server asked to retry");
   }
 }
-
 async function pull() {
   const since = localStorage.getItem("lastSync") || 0;
-
-  const { data } = await api.get("/sync/pull", {
-    params: { since },
-    timeout: 30000,
+  const { data } = await api.get("/sync/pull", { params: { since }, timeout: 30000 });
+  const { customers, payments, locations, customerIds, paymentIds, serverTime } = data;
+  await db.transaction("rw", db.customers, db.payments, db.locations, async () => {
+    await db.customers.bulkPut(customers);
+    await db.locations.bulkPut(locations);
+    const clientIds = payments.map((p) => p.clientId).filter(Boolean);
+    if (clientIds.length) await db.payments.where("clientId").anyOf(clientIds).delete();
+    await db.payments.bulkPut(payments.map((p) => ({ ...p, synced: 1 })));
+    const keepC = new Set(customerIds);
+    const keepP = new Set(paymentIds);
+    await db.customers.filter((c) => !keepC.has(c._id)).delete();
+    await db.payments.filter((p) => p.synced === 1 && !keepP.has(p._id)).delete();
   });
-
-  const {
-    customers,
-    payments,
-    locations,
-    serverTime,
-  } = data;
-
-  // Validate before modifying IndexedDB.
-  if (
-    !Array.isArray(customers) ||
-    !Array.isArray(payments) ||
-    !Array.isArray(locations) ||
-    !Number.isFinite(Number(serverTime))
-  ) {
-    console.error("Invalid sync/pull response:", data);
-    throw new Error(
-      "Sync response is missing customers, payments, locations, or serverTime"
-    );
-  }
-
-  await db.transaction(
-    "rw",
-    db.customers,
-    db.payments,
-    db.locations,
-    async () => {
-      if (customers.length) {
-        await db.customers.bulkPut(customers);
-      }
-
-      if (locations.length) {
-        await db.locations.bulkPut(locations);
-      }
-
-      // Replace only matching payment records.
-      const clientIds = payments
-        .map((p) => p.clientId)
-        .filter(Boolean);
-
-      if (clientIds.length) {
-        await db.payments
-          .where("clientId")
-          .anyOf(clientIds)
-          .delete();
-      }
-
-      if (payments.length) {
-        await db.payments.bulkPut(
-          payments.map((p) => ({ ...p, synced: 1 }))
-        );
-      }
-
-      // Do not delete records merely because they are absent
-      // from an incremental sync response.
-    }
-  );
 
   localStorage.setItem("lastSync", String(serverTime));
 }
-
 async function doSync() {
   try {
     do {
