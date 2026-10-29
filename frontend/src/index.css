@@ -111,3 +111,14 @@ html.dark .input {
 html.dark .input:focus {
   border-color: #818cf8;
 }
+@keyframes copyToastSlideUp {
+  from {
+    opacity: 0;
+    translate: 0 18px;
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}

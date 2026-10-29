@@ -76,20 +76,47 @@ const pushChanges = async (req, res) => {
 
   res.json({ success: true, results });
 };
+
 const pullChanges = async (req, res) => {
   try {
     const serverTime = Date.now();
-    const since = new Date(Number(req.query.since) || 0);
+    const sinceValue = Number(req.query.since) || 0;
+    const isInitialSync = sinceValue <= 0;
 
-    const [customers, payments, locations, customerIds, paymentIds] = await Promise.all([
-      Customer.find({ updatedAt: { $gt: since } }).populate("location", "name").lean(),
-      Payment.find({ updatedAt: { $gt: since } }).lean(),
+    const customerFilter = isInitialSync
+      ? {}
+      : { updatedAt: { $gt: new Date(sinceValue) } };
+
+    const paymentFilter = isInitialSync
+      ? {}
+      : { updatedAt: { $gt: new Date(sinceValue) } };
+
+    const [
+      customers,
+      payments,
+      locations,
+      customerIds,
+      paymentIds,
+    ] = await Promise.all([
+      Customer.find(customerFilter)
+        .populate("location", "name")
+        .lean(),
+
+      Payment.find(paymentFilter)
+        .lean(),
+
       Location.find({}).lean(),
-      Customer.find({}).select("_id").lean(),
-      Payment.find({}).select("_id").lean(),
+
+      Customer.find({})
+        .select("_id")
+        .lean(),
+
+      Payment.find({})
+        .select("_id")
+        .lean(),
     ]);
 
-    res.json({
+    return res.json({
       success: true,
       serverTime,
       customers,
@@ -100,7 +127,12 @@ const pullChanges = async (req, res) => {
     });
   } catch (err) {
     console.error("SYNC PULL ERROR:", err);
-    res.status(500).json({ success: false, message: "Pull failed" });
+
+    return res.status(500).json({
+      success: false,
+      message: "Pull failed",
+    });
   }
 };
+
 module.exports = { pushChanges, pullChanges };

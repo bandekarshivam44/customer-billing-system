@@ -1,5 +1,6 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import { createPortal } from "react-dom";
 import jsPDF from "jspdf";
 import {
   Search,
@@ -1822,11 +1823,12 @@ function CustomerDetailsModal({ customerId, onClose, onChanged }) {
                 </h1>
 
                 <div className="mt-4 grid grid-cols-1 gap-5 text-sm sm:grid-cols-2">
-                  <DetailItem
-                    icon={<CreditCard size={15} />}
-                    label="NUID"
-                    value={customer.nuid || "-"}
-                  />
+                  <div className="min-w-0 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+                    <CopyableNUID
+                      value={customer.nuid || "-"}
+                      toastPosition="screen"
+                    />
+                  </div>
                   <DetailItem
                     icon={<MapPin size={15} />}
                     label="Location"
@@ -2095,15 +2097,14 @@ function CustomerCard({
         {/* DETAILS */}
         <div className="mt-5 grid grid-cols-2 gap-3">
           {/* NUID */}
-          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-              NUID
-            </p>
-
-            <p className="mt-1 truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
-              {customer.nuid || "-"}
-            </p>
-          </div>
+{/* NUID - ENTIRE OUTER BOX IS CLICKABLE */}
+<div className="rounded-xl border border-transparent bg-slate-50 p-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40">
+  <CopyableNUID
+    value={customer.nuid || "-"}
+    variant="card"
+    className="w-full rounded-lg p-0 hover:bg-transparent focus:ring-0"
+  />
+</div>
 
           {/* PACKAGE */}
           <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
@@ -2713,6 +2714,119 @@ function ExportModal({
     </div>
   );
 }
+function CopyableNUID({
+  value,
+  variant = "table",
+  className = "",
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const hasValue = Boolean(value && value !== "-");
+
+  useEffect(() => {
+    if (!copied) return;
+
+    const timer = setTimeout(() => {
+      setCopied(false);
+    }, 1800);
+
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  const handleCopy = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!hasValue) return;
+
+    try {
+      await navigator.clipboard.writeText(String(value));
+      setCopied(true);
+    } catch (error) {
+      const textarea = document.createElement("textarea");
+
+      textarea.value = String(value);
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "0";
+
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      const successful = document.execCommand("copy");
+
+      document.body.removeChild(textarea);
+
+      if (successful) {
+        setCopied(true);
+      } else {
+        console.error("Failed to copy NUID:", error);
+      }
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleCopy}
+        disabled={!hasValue}
+        title={hasValue ? "Click to copy NUID" : "No NUID available"}
+        aria-label={hasValue ? `Copy NUID ${value}` : "No NUID available"}
+className={`group min-w-0 text-left ${
+  variant === "card"
+    ? "block w-full cursor-pointer focus:outline-none"
+    : "inline-flex max-w-full cursor-pointer flex-col items-start rounded-md px-2 py-1 transition hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:hover:bg-indigo-950/60"
+} disabled:cursor-default ${className}`}
+      >
+        <span className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            NUID
+          </span>
+
+          {hasValue && (
+            <span className="inline-flex items-center justify-center text-slate-400 transition group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+              {copied ? (
+                <Check size={14} strokeWidth={2.5} />
+              ) : (
+                <Copy size={14} />
+              )}
+            </span>
+          )}
+        </span>
+
+        {/* NUID VALUE */}
+        <span className="mt-1 block max-w-full break-all text-sm font-semibold text-slate-700 dark:text-slate-200">
+          {value || "-"}
+        </span>
+      </button>
+
+      {/* GLOBAL TOAST: ALWAYS AT THE BOTTOM-CENTRE OF THE SCREEN */}
+      {copied &&
+        createPortal(
+          <div
+  className="pointer-events-none fixed inset-x-0 bottom-6 z-[99999] flex justify-center px-4"
+>
+  <div
+    role="status"
+    aria-live="polite"
+    className="flex items-center gap-2 whitespace-nowrap rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-xl dark:border-emerald-900 dark:bg-slate-900 dark:text-white"
+    style={{
+      animation: "copyToastSlideUp 220ms ease-out",
+    }}
+  >
+    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+      <Check size={13} strokeWidth={3} />
+    </span>
+
+    Copied!
+  </div>
+</div>,
+          document.body,
+        )}
+    </>
+  );
+}
 // ======================================================
 // TABLE ROW
 // ======================================================
@@ -2962,13 +3076,15 @@ function CustomerTableRow({
         )}
       </td>
 
-      {/* NUID */}
-
+      {/* NUID - CLICK TO COPY */}
       <td
         onClick={onClick}
         className="whitespace-nowrap px-4 py-4 text-sm text-slate-600 dark:text-slate-300"
       >
-        {customer.nuid || "-"}
+        <CopyableNUID
+          value={customer.nuid || "-"}
+          className="text-sm py-2 px-3 text-slate-600 dark:text-slate-300"
+        />
       </td>
 
       {/* PACKAGE */}
@@ -3484,12 +3600,8 @@ function CustomerFormModal({ customer, locations, onClose, onSaved }) {
             <X size={20} />
           </button>
         </div>
-
-        {/* FORM wraps body + footer */}
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          {/* BODY (only scrolling part) */}
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
-            {/* CODE + NUID */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-sm font-semibold">Code</label>
@@ -4006,7 +4118,6 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
           statusMonth: pm,
           statusYear: py,
         });
-
         const res = await api.post("/customers", payload("active"));
         let id = (res.data?.data ?? res.data?.customer ?? res.data)?._id;
         if (!id) {
@@ -4015,7 +4126,6 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
         }
         if (!id)
           throw new Error("Customer was created but its id could not be read");
-
         try {
           if (row.status !== "active") {
             await api.put(`/customers/${id}`, payload(row.status));
@@ -4051,8 +4161,6 @@ function ImportCustomersModal({ locations = [], onClose, onImported }) {
           throw e;
         }
       };
-
-      // read the first customer back and compare with what we meant to save
       const verify = async (id, row) => {
         const problems = [];
         const c = (await api.get(`/customers/${id}`)).data?.data;
@@ -4319,7 +4427,23 @@ export default function Customers() {
   const paymentsLive = useLiveQuery(() => db.payments.toArray(), []);
   const customers = customersLive ?? EMPTY;
   const locations = locationsLive ?? EMPTY;
-
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 250);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
   const payments = useMemo(() => {
     const map = new Map(customers.map((c) => [String(c._id), c]));
     return (paymentsLive ?? EMPTY).map((p) => {
@@ -4327,7 +4451,7 @@ export default function Customers() {
       return { ...p, customer: map.get(cid) || p.customer };
     });
   }, [paymentsLive, customers]);
-    const paymentsByCustomer = useMemo(() => {
+  const paymentsByCustomer = useMemo(() => {
     const m = new Map();
     payments.forEach((p) => {
       const k = String(p.customer?._id || p.customer);
@@ -4363,6 +4487,7 @@ export default function Customers() {
     () => !localStorage.getItem("lastSync"),
   );
   const loading = customersLive === undefined || initialSync;
+  console.log("DEBUG", { customersLive, initialSync, loading });
   const [error, setError] = useState("");
 
   const [showFilters, setShowFilters] = useState(false);
@@ -5516,7 +5641,9 @@ export default function Customers() {
                     <MemoizedCustomerTableRow
                       key={customer._id}
                       customer={customer}
-                      payments={paymentsByCustomer.get(String(customer._id)) || EMPTY}
+                      payments={
+                        paymentsByCustomer.get(String(customer._id)) || EMPTY
+                      }
                       index={index}
                       monthBeforePrevious={monthBeforePrevious}
                       previousMonth={previousMonth}
@@ -5705,6 +5832,24 @@ export default function Customers() {
           </div>
         )}
       </div>
+      {/* SCROLL TO TOP */}
+      <button
+  type="button"
+  onClick={scrollToTop}
+  aria-label="Scroll to top"
+  title="Scroll to top"
+  className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:border-indigo-700 hover:bg-indigo-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-indigo-500 dark:bg-indigo-600 dark:text-white dark:shadow-indigo-500/20 dark:hover:border-indigo-700 dark:hover:bg-indigo-700 ${
+  showScrollTop
+    ? "translate-y-0 scale-100 opacity-100"
+    : "pointer-events-none translate-y-4 scale-90 opacity-0"
+}`}
+>
+  <ChevronRight
+    size={22}
+    className="-rotate-90"
+    strokeWidth={2}
+  />
+</button>
     </div>
   );
 }
